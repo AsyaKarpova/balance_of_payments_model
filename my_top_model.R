@@ -39,7 +39,7 @@ prices = mutate(prices,
                 rub_usd_eur_1 = rub_usd_1 * usd_eur_1,
                 dif_usd_rub = (rub_usd_1 - rub_usd_2)/rub_usd_2)
 
-end = 156
+end = 156 # number of months with full gas, oil, op data
 
 pse0 = function(y, yhat) {
   return(sqrt(sum((y - yhat)^2)) / sum(y))
@@ -124,6 +124,7 @@ MAPE(pred_oil$r_hat_oil[1:96], prices$r_exp_oil[1:96])
 MAPE(pred_oil$p_hat_oil[1:96], prices$p_exp_oil[1:96])
 
 # MY OPTIMIZATION for oil product model
+
 par_op = c(0.021455161,
            0.001086559,
            0.0032033,
@@ -151,12 +152,13 @@ par = par_op
 make_pred_op = function(par, X, R){
   X_p = as.matrix(X[4:nrow(X), 1:5])
   p_hat_op = c(R[1:3,1], (X_p %*% par[1:5])) # считает прогноз цены
+  head(p_hat_op)
+  
   X_v = tibble(const2 = 1, curr = X$rub_usd_eur_1, 
                v_prod_op_1 = X$v_prod_op_1,
                p_hat_op = lag(p_hat_op, 1))
   X_v_by_par = as.matrix(X_v) %*% par[6:9]
   dummies = rep(c(par[10:15], 1, par[16:20]), 13)
-  dummies
   v_hat_op = rep(NA, nrow(X))
   v_hat_op[1:4] = R$v_exp_op[1:4]
   v_hat_op[5:end] = X_v_by_par[5:end] * dummies[5:end]
@@ -176,6 +178,7 @@ X = prices[1:end, ] %>%
          brent, brent_1, brent_2, brent_3, 
          rub_usd_eur_1, v_prod_op_1) 
 
+
 R = prices[1:end, ] %>% 
   select(p_exp_op, v_exp_op, r_exp_op)
 
@@ -193,10 +196,9 @@ error_opt_op = function(par, X, R, R_quarter){
                 real = R$v_exp_op[1:96], real_quarter = R_quarter$v_exp_op)
   error_r = pse(pred = frcst$r_hat_op[1:96], pred_quarter = frcst$r_hat_op_quarter,
                 real = R$r_exp_op[1:96], real_quarter = R_quarter$r_exp_op)
-  print(error_r)
   return(error_p + error_v + error_r)
 }
-par = rep(0.02, 19)
+
 
 result = optim(par = rep(0.02, 19), X = X, R = R, R_quarter = R_quarter,
                fn = error_opt_op, 
