@@ -107,7 +107,7 @@ result_sa = GenSA(lower = rep(-1, 18),
                   fn = error_opt_oil,
                   X = X, R = R, R_quarter = R_quarter,
                   control = list(verbose = TRUE, max.time = 300))
-par_oil = result_sa$par
+#par_oil = result_sa$par
 
 pred_oil = make_pred_oil(par_oil, X, R)
 
@@ -123,31 +123,11 @@ MAPE(pred_oil$v_hat_oil[1:96], prices$v_exp_oil[1:96])
 MAPE(pred_oil$r_hat_oil[1:96], prices$r_exp_oil[1:96])
 MAPE(pred_oil$p_hat_oil[1:96], prices$p_exp_oil[1:96])
 
+r_hat_oil = pred_oil$r_hat_oil
+r_hat_oil_quarter = pred_oil$r_hat_oil_quarter
+
 # MY OPTIMIZATION for oil product model
 
-par_op = c(0.021455161,
-           0.001086559,
-           0.0032033,
-           0.001482887,
-           0.000701422,
-           -4.289339137,
-           0.019229557,
-           0.658309357,
-           0.217390488,
-           0.896034396,
-           1.016929155,
-           1.133439858,
-           1.020017427,
-           1.117458467,
-           1.102230487,
-           1.005589886,
-           0.994274199,
-           1.053676796,
-           0.993775918,
-           1.090384854)
-           
-           
-          
 par = par_op
 make_pred_op = function(par, X, R){
   X_p = as.matrix(X[4:nrow(X), 1:5])
@@ -178,10 +158,8 @@ X = prices[1:end, ] %>%
          brent, brent_1, brent_2, brent_3, 
          rub_usd_eur_1, v_prod_op_1) 
 
-
 R = prices[1:end, ] %>% 
   select(p_exp_op, v_exp_op, r_exp_op)
-
 
 R_quarter = prices_quater %>% 
   select(p_exp_op, v_exp_op, r_exp_op) %>% na.omit()
@@ -204,7 +182,8 @@ result = optim(par = rep(0.02, 19), X = X, R = R, R_quarter = R_quarter,
                fn = error_opt_op, 
                method = 'L-BFGS-B')
 
-par_op = result$par
+#par_op = result$par
+
 pred_op = make_pred_op(par_op, X, R)
 autoplot(ts.union(real_data = ts(prices$p_exp_op[1:end], start = c(2006, 1), freq = 12),  
                   model = ts(pred_op$p_hat_op, start = c(2006, 1), freq = 12))) + ylab('p_exp_op')
@@ -217,7 +196,11 @@ MAPE(pred_op$v_hat_op[1:96], prices$v_exp_op[1:96])
 MAPE(pred_op$r_hat_op[1:96], prices$r_exp_op[1:96])
 MAPE(pred_op$p_hat_op[1:96], prices$p_exp_op[1:96])
 
+r_hat_op = pred_op$r_hat_op
+r_hat_op_quarter = pred_op$r_hat_op_quarter
 ### optimization for gas model
+
+par = par_gas
 
 make_pred_gas = function(par, X, R){
   X_p = as.matrix(X[7:nrow(X), 1:9]) 
@@ -279,7 +262,8 @@ result_sa = GenSA(lower = rep(-1, 18),
                   fn = error_opt_gas,
                   X = X, R = R, R_quarter = R_quarter,
                   control = list(verbose = TRUE, max.time = 300))
-par_gas = result$par
+
+#par_gas = result$par
 pred_gas = make_pred_gas(par_gas, X, R)
 autoplot(ts.union(real_data = ts(prices$p_exp_gas[1:end], start = c(2006, 1), freq = 12),  
                   model = ts(pred_gas$p_hat_gas, start = c(2006, 1), freq = 12))) + ylab('p_exp_gas')
@@ -292,8 +276,37 @@ MAPE(pred_gas$v_hat_gas[1:96], prices$v_exp_gas[1:96])
 MAPE(pred_gas$r_hat_gas[1:96], prices$r_exp_gas[1:96])
 MAPE(pred_gas$p_hat_gas[1:96], prices$p_exp_gas[1:96])
 
+r_hat_gas = pred_gas$r_hat_gas
+r_hat_gas_quarter = pred_gas$r_hat_gas_quarter
 
+# optimisation for export other goods model
 
+X = tibble(const = 1, 
+           r_hat_goods = r_hat_gas + r_hat_oil + r_hat_op, 
+           r_hat_good_dum = r_hat_goods * prices$dum_1114[1:end],
+           gpd_defl = lag(prices$n_y, 1)[1:end] / prices$rub_usd_1[1:end])
+
+R = prices[1:end, ] %>% select(r_exp_othg)
+
+r_exp_othg_pred = function(par, X, R){
+  dummies = rep(c(par[5:10], 1, par[11:15]), 13)
+  r_hat_othg_dum = (as.matrix(X) %*% par[1:4]) * dummies
+  r_hat_othg = c(R[1,1], r_hat_othg_dum)
+  r_hat_othg_quarter = roll_sum(r_hat_othg, n = 3, by = 3) # рассчет квартальной выручки
+  return(list(r_hat_othg = r_hat_othg, 
+              r_hat_othg_quarter = r_hat_othg_quarter))
+}
+
+error_opt_gas = function(par, X, R, R_quarter){
+  frcst = make(par, X, R)
+  error_p = pse(pred = frcst$p_hat_gas[1:96], pred_quarter = frcst$p_hat_gas_quarter,
+                real = R$p_exp_gas[1:96], real_quarter = R_quarter$p_exp_gas)
+  error_v = pse(pred = frcst$v_hat_gas[1:96], pred_quarter = frcst$v_hat_gas_quarter,
+                real = R$v_exp_gas[1:96], real_quarter = R_quarter$v_exp_gas)
+  error_r = pse(pred = frcst$r_hat_gas[1:96], pred_quarter = frcst$r_hat_gas_quarter,
+                real = R$r_exp_gas[1:96], real_quarter = R_quarter$r_exp_gas)
+  return(error_p + error_v + error_r)
+}
 
 
 
@@ -343,4 +356,28 @@ par_gas = c(-0.016227812,
             0.848908983,
             0.91513756,
             0.972719699)
+
+
+par_op = c(0.021455161,
+           0.001086559,
+           0.0032033,
+           0.001482887,
+           0.000701422,
+           -4.289339137,
+           0.019229557,
+           0.658309357,
+           0.217390488,
+           0.896034396,
+           1.016929155,
+           1.133439858,
+           1.020017427,
+           1.117458467,
+           1.102230487,
+           1.005589886,
+           0.994274199,
+           1.053676796,
+           0.993775918,
+           1.090384854)
+
+
               
