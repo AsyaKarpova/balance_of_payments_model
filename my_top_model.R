@@ -369,27 +369,50 @@ X = tibble(consump_defl = lag(prices$n_c, 1)[1:end]/prices$rub_usd_1[1:end],
 R = prices %>% 
         select(r_imp_goods, r_imp_serv, r_imp_all)
 
+
+
 R_quarter = prices_quater %>% 
   select(r_imp_goods, r_imp_serv, r_imp_all) %>% na.omit()
+
 
 par = c(par_imp_gds, par_imp_serv)
 
 make_pred_imp = function(par, X, R){
   dummies_gds = rep(c(par[6:11], 1, par[12:16]), 13)
-  r_hat_imp_gds = rep(NA, nrow(X))
+  r_hat_imp_gds = rep(0, nrow(X))
   r_hat_imp_gds[1] = R[1,1]
   r_hat_imp_gds[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[2:5]) * dummies_gds[2:end] + par[1]
   r_hat_imp_gds_quarter = roll_sum(r_hat_imp_gds, n = 3, by = 3)
-  r_hat_imp_gds
-  dummies_serv = rep(c(par[22:26], 1, par[27:32]), 13)
-  r_hat_imp_serv = rep(NA, nrow(X))
-  r_hat_imp_serv[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[18:21]) * dummies_serv[2:end] + par[17]
-  r_hat_imp_serv_quarter = roll_sum(r_hat_imp_serv, n = 3, by = 3)
-  r_hat_imp_serv %>%  head()
-  
+  X_serv = select(X, -r_hat_goods) %>% mutate(r_hat_imp_gds = r_hat_imp_gds)
+  dummies_serv = rep(c(par[22:27], 1, par[28:32]), 13)
+  r_hat_imp_serv = rep(0, nrow(X_serv))
+  r_hat_imp_serv[2:end] = (as.matrix(X_serv[2:nrow(X_serv), ]) %*% par[18:21]) * dummies_serv[2:end] + par[17]
+  r_hat_imp_serv_quarter = c(NaN, roll_sum(r_hat_imp_serv[4:length(r_hat_imp_serv)], n = 3, by = 3))
+  r_imp_all = r_hat_imp_gds + r_hat_imp_serv
+  r_imp_all_quarter = c(NaN, roll_sum(r_imp_all[4:length(r_imp_all)], n = 3, by = 3))
   return(list(r_hat_imp_gds = r_hat_imp_gds, 
-              r_hat_imp_gds_quarter = r_hat_imp_gds_quarter))
+              r_hat_imp_gds_quarter = r_hat_imp_gds_quarter,
+              r_hat_imp_serv = r_hat_imp_serv, 
+              r_hat_imp_serv_quarter = r_hat_imp_serv_quarter,
+              r_imp_all = r_imp_all,
+              r_imp_all_quarter = r_imp_all_quarter))
 }
+
+error_opt_imp = function(par, X, R, R_quarter){
+  frcst = make_pred_imp(par, X, R)
+  error_imp_gds = pse(pred = frcst$r_hat_imp_gds[1:156], pred_quarter = frcst$r_hat_imp_gds_quarter,
+                   real = R$r_imp_goods[1:156], real_quarter = R_quarter$r_imp_goods)
+
+  error_imp_serv  = pse(pred = frcst$r_hat_imp_serv[73:156], pred_quarter = (frcst$r_hat_imp_serv_quarter[2:52]),
+                   real = R$r_imp_serv[73:156], real_quarter = (R_quarter$r_imp_serv)[2:52])
+
+  error_imp_all  = pse(pred = frcst$r_imp_all[73:156], pred_quarter = frcst$r_imp_all_quarter[2:52],
+                        real = R$r_imp_all[73:156], real_quarter = R_quarter$r_imp_all[2:52])
+  error = error_imp_gds + error_imp_serv + error_imp_all
+  return(error)
+}
+
+
 
 par_oil = c(-0.002649611,
               0.002994676,
@@ -517,3 +540,4 @@ par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg
                    par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv)
 export(par_model, 'par_model.Rds')
 par = import('par_model.Rds')
+
