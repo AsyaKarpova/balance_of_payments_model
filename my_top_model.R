@@ -4,24 +4,38 @@ library(RcppRoll) # for rolling window operations
 library(tidyverse)
 library(MLmetrics)
 library(GenSA)
+library(stats)
 
 prices = import('data_month.xlsx')
 prices_quater = import('data_quarter.xlsx')
+par_model = import('par_model.Rds')
+
+### parameters from excel
+par_oil = par_model$par_oil
+par_gas = par_model$par_gas
+par_op = par_model$par_op
+par_othg = par_model$par_othg
+par_imp_gds = par_model$par_imp_gds
+par_imp_serv = par_model$par_imp_serv
+
+lag = function(ts, n){
+  return(dplyr::lag(ts, n = n))
+}
 
 # make dataframe with lags
 prices = mutate(prices, 
                 const1 = 1,
                 const2 = 1,
-                brent_1 = lag(prices$brent),
+                brent_1 = lag(prices$brent, n = 1),
                 brent_2 = lag(prices$brent, n = 2),
                 brent_3 = lag(prices$brent, n = 3),
                 brent_4 = lag(prices$brent, n = 4),
                 brent_5 = lag(prices$brent, n = 5),
                 brent_6 = lag(prices$brent, n = 6),
-                gas_europe_1 = lag(prices$gas_europe), 
+                gas_europe_1 = lag(prices$gas_europe, n = 1), 
                 gas_europe_2 = lag(prices$gas_europe, n = 2), 
                 gas_europe_3 = lag(prices$gas_europe, n = 3), 
-                gas_lng_1 = lag(prices$gas_lng), 
+                gas_lng_1 = lag(prices$gas_lng, n = 1), 
                 gas_lng_2 = lag(prices$gas_lng, n = 2), 
                 gas_lng_3 = lag(prices$gas_lng, n = 3), 
                 gas_lng_4 = lag(prices$gas_lng, n = 4),
@@ -34,12 +48,16 @@ prices = mutate(prices,
                 vnok_1 = lag(prices$n_j, 1), 
                 n_ds_1 = lag(prices$n_ds, 1),
                 n_c_1 = lag(prices$n_c, 1),
+                n_j_1 = lag(prices$n_j, 1), # n_j — ВНОК
+                n_ds = lag(prices$n_ds, 1),
                 v_exp_oil_1 = lag(prices$v_exp_oil, 1), 
                 p_exp_oil_3 = lag(prices$p_exp_oil, 3),
                 rub_usd_eur_1 = rub_usd_1 * usd_eur_1,
                 dif_usd_rub = (rub_usd_1 - rub_usd_2)/rub_usd_2)
 
 end = 156 # number of months with full gas, oil, op data
+
+
 
 pse0 = function(y, yhat) {
   return(sqrt(sum((y - yhat)^2)) / sum(y))
@@ -51,13 +69,13 @@ pse = function(pred, pred_quarter, real, real_quarter){
 
 # MY OPTIMIZATION for oil model
 par = par_oil
+
 X = prices[1:end, ] %>% 
   select(const1, brent, brent_1, const2, rub_usd_1) 
 R = prices[1:end, ] %>% 
   select(p_exp_oil, v_exp_oil, r_exp_oil)
 R_quarter = prices_quater %>%
   select(p_exp_oil, v_exp_oil, r_exp_oil) %>% na.omit()
-
 
 make_pred_oil = function(par, X, R){
   X_p = as.matrix(X[2:nrow(X), 1:3])
@@ -257,15 +275,15 @@ error_opt_gas = function(par, X, R, R_quarter){
 }
 
 
-result = optim(par = c(rep(0.02, 15), rep(0.99, 11)), X = X, R = R, R_quarter = R_quarter,
-               fn = error_opt_gas, 
-               method = 'L-BFGS-B')
+#result = optim(par = c(rep(0.02, 15), rep(0.99, 11)), X = X, R = R, R_quarter = R_quarter,
+ #              fn = error_opt_gas, 
+  #             method = 'L-BFGS-B')
 
-result_sa = GenSA(lower = rep(-1, 18),
-                  upper = rep(1.9, 18),
-                  fn = error_opt_gas,
-                  X = X, R = R, R_quarter = R_quarter,
-                  control = list(verbose = TRUE, max.time = 300))
+#result_sa = GenSA(lower = rep(-1, 18),
+ #                 upper = rep(1.9, 18),
+  #                fn = error_opt_gas,
+   #               X = X, R = R, R_quarter = R_quarter,
+    #              control = list(verbose = TRUE, max.time = 300))
 
 #par_gas = result$par
 pred_gas = make_pred_gas(par_gas, X, R)
@@ -284,10 +302,12 @@ r_hat_gas = pred_gas$r_hat_gas
 r_hat_gas_quarter = pred_gas$r_hat_gas_quarter
 
 # optimisation for export other goods model
+
 par = par_othg
+
 X = tibble(const = 1, 
-           r_hat_goods = r_hat_gas + r_hat_oil + r_hat_op, 
-           r_hat_good_dum = r_hat_goods * prices$dum_1114[1:end],
+           r_hat_oog = r_hat_gas + r_hat_oil + r_hat_op, 
+           r_hat_good_dum = r_hat_oog * prices$dum_1114[1:end],
            gpd_defl = lag(prices$n_y, 1)[1:end] / prices$rub_usd_1[1:end])
 
 R = prices %>% select(r_exp_othg, r_exp_goods)
@@ -303,15 +323,13 @@ make_pred_exp = function(par, X, R){
   r_hat_othg[1] = R[1,1]
   r_hat_othg[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:4]) * dummies[2:end]
   r_hat_othg_quarter = roll_sum(r_hat_othg, n = 3, by = 3) # рассчет квартальной выручки
-  r_hat_goods
-  r_hat_goods = X$r_hat_goods + r_hat_othg
+  r_hat_goods = X$r_hat_oog + r_hat_othg
   r_hat_goods_quarter = roll_sum(r_hat_goods, n = 3, by = 3)
   return(list(r_hat_othg = r_hat_othg, 
               r_hat_othg_quarter = r_hat_othg_quarter,
               r_hat_goods = r_hat_goods, 
               r_hat_goods_quater = r_hat_goods_quarter))
 }
-
 
 
 error_opt_othg = function(par, X, R, R_quarter){
@@ -335,11 +353,43 @@ autoplot(ts.union(real_data = ts(prices$r_exp_goods[1:156], start = c(2006, 1), 
 r_hat_othg = pred_exp$r_hat_othg[1:96]
 r_hat_goods = pred_exp$r_hat_goods[1:156]
 
+
 MAPE(r_hat_othg, prices$r_exp_othg[1:96])
 MAPE(r_hat_goods, prices$r_exp_goods[1:156])
 
 
-# Model for goods import
+# Model for goods import (ПРОГНОЗИРУЕМ НАЗАД!!!!) (r_imp_goods^ + r_imp_serv^ + r_imp_all^)
+
+par = par_imp_gds
+X = tibble(consump_defl = lag(prices$n_c, 1)[1:end]/prices$rub_usd_1[1:end],
+           j_defl = lag(prices$n_j, 1)[1:end]/prices$rub_usd_1[1:end],
+           ds_defl = (prices$n_ds_1)[1:end]/prices$rub_usd_1[1:end],
+           r_hat_goods = r_hat_goods)
+
+R = prices %>% 
+        select(r_imp_goods, r_imp_serv, r_imp_all)
+
+R_quarter = prices_quater %>% 
+  select(r_imp_goods, r_imp_serv, r_imp_all) %>% na.omit()
+
+par = c(par_imp_gds, par_imp_serv)
+
+make_pred_imp = function(par, X, R){
+  dummies_gds = rep(c(par[6:11], 1, par[12:16]), 13)
+  r_hat_imp_gds = rep(NA, nrow(X))
+  r_hat_imp_gds[1] = R[1,1]
+  r_hat_imp_gds[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[2:5]) * dummies_gds[2:end] + par[1]
+  r_hat_imp_gds_quarter = roll_sum(r_hat_imp_gds, n = 3, by = 3)
+  r_hat_imp_gds
+  dummies_serv = rep(c(par[22:26], 1, par[27:32]), 13)
+  r_hat_imp_serv = rep(NA, nrow(X))
+  r_hat_imp_serv[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[18:21]) * dummies_serv[2:end] + par[17]
+  r_hat_imp_serv_quarter = roll_sum(r_hat_imp_serv, n = 3, by = 3)
+  r_hat_imp_serv %>%  head()
+  
+  return(list(r_hat_imp_gds = r_hat_imp_gds, 
+              r_hat_imp_gds_quarter = r_hat_imp_gds_quarter))
+}
 
 par_oil = c(-0.002649611,
               0.002994676,
@@ -461,3 +511,9 @@ par_imp_serv = c(0.319283562,
                0.900416689,
                0.697987397,
                1.011055266)
+
+
+par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg = par_othg,
+                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv)
+export(par_model, 'par_model.Rds')
+par = import('par_model.Rds')
