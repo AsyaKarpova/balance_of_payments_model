@@ -17,6 +17,8 @@ par_op = par_model$par_op
 par_othg = par_model$par_othg
 par_imp_gds = par_model$par_imp_gds
 par_imp_serv = par_model$par_imp_serv
+par_exp_serv = par_model$par_exp_serv
+
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
@@ -387,9 +389,9 @@ make_pred_imp = function(par, X, R){
   dummies_serv = rep(c(par[22:27], 1, par[28:32]), 13)
   r_hat_imp_serv = rep(0, nrow(X_serv))
   r_hat_imp_serv[2:end] = (as.matrix(X_serv[2:nrow(X_serv), ]) %*% par[18:21]) * dummies_serv[2:end] + par[17]
-  r_hat_imp_serv_quarter = c(NaN, roll_sum(r_hat_imp_serv[4:length(r_hat_imp_serv)], n = 3, by = 3))
+  r_hat_imp_serv_quarter = c(NA, roll_sum(r_hat_imp_serv[4:length(r_hat_imp_serv)], n = 3, by = 3))
   r_imp_all = r_hat_imp_gds + r_hat_imp_serv
-  r_imp_all_quarter = c(NaN, roll_sum(r_imp_all[4:length(r_imp_all)], n = 3, by = 3))
+  r_imp_all_quarter = c(NA, roll_sum(r_imp_all[4:length(r_imp_all)], n = 3, by = 3))
   return(list(r_hat_imp_gds = r_hat_imp_gds, 
               r_hat_imp_gds_quarter = r_hat_imp_gds_quarter,
               r_hat_imp_serv = r_hat_imp_serv, 
@@ -412,6 +414,61 @@ error_opt_imp = function(par, X, R, R_quarter){
   return(error)
 }
 
+
+par_imp = c(par_imp_gds, par_imp_serv)
+
+pred_imp = make_pred_imp(par_imp, X, R)
+autoplot(ts.union(real_data = ts(prices$r_imp_goods, start = c(2006, 1), freq = 12),  
+                  model = ts(pred_imp$r_hat_imp_gds, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
+autoplot(ts.union(real_data = ts(prices$r_imp_serv[1:156], start = c(2006, 1), freq = 12),  
+                  model = ts(pred_imp$r_hat_imp_serv, start = c(2006, 1), freq = 12))) + ylab('revenue from import of services')
+autoplot(ts.union(real_data = ts(prices$r_imp_all[1:156], start = c(2006, 1), freq = 12),  
+                  model = ts(pred_imp$r_imp_all, start = c(2006, 1), freq = 12))) + ylab('revenue from all import')
+
+r_hat_imp_gds = pred_imp$r_hat_imp_gds[1:156]
+r_hat_imp_serv = pred_imp$r_hat_imp_serv[1:156]
+r_hat_imp_all = pred_imp$r_imp_all[1:156]
+
+
+MAPE(r_hat_imp_gds, prices$r_imp_goods[1:156])
+MAPE(r_hat_imp_serv[73:156], prices$r_imp_serv[73:156])
+MAPE(r_hat_imp_all[73:156], prices$r_imp_all[73:156])
+
+
+### Model for export of services
+
+par = par_exp_serv
+X = tibble(const = 1,
+           r_hat_goods = r_hat_goods,
+           r_hat_imp_serv = r_hat_imp_serv)
+
+
+R = prices %>% 
+  select(r_exp_serv)
+
+R_quarter = prices_quater %>% 
+  select(r_exp_serv) %>% na.omit()
+
+
+make_pred_exp_serv = function(par, X, R){
+  dummies = rep(c(par[4:9], 1, par[10:14]), 13)
+  r_hat_exp_serv = rep(NA, nrow(X))
+  r_hat_exp_serv[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:3]) * dummies[2:end]
+  r_hat_exp_serv_quarter = roll_sum(r_hat_exp_serv, n = 3, by = 3) # рассчет квартальной выручки
+  return(list(r_hat_exp_serv = r_hat_exp_serv, 
+              r_hat_exp_serv_quarter = r_hat_exp_serv_quarter))
+}
+
+### CHECK
+error_opt_exp_serv= function(par, X, R, R_quarter){
+  frcst = make_pred_exp_serv(par, X, R)
+  error = pse(pred = frcst$r_hat_exp_serv[73:156], pred_quarter = frcst$r_hat_exp_serv_quarter[2:52],
+                      real = R$r_exp_serv[73:156], real_quarter = R_quarter$r_exp_serv[2:52])
+  return(error)
+}
+
+
+par_imp = c(p
 
 
 par_oil = c(-0.002649611,
@@ -536,8 +593,24 @@ par_imp_serv = c(0.319283562,
                1.011055266)
 
 
+par_exp_serv = c(1.835400425,
+               0.012179729,
+               0.330359785,
+               0.9028616,
+               0.978315981,
+               0.976041317,
+               0.994301665,
+               0.989340012,
+               1.022732484,
+               0.926343089,
+               0.965758614,
+               0.995769699,
+               0.957568178,
+               1.08019597)
+
+
 par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg = par_othg,
-                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv)
+                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_exp_serv = par_exp_serv)
 export(par_model, 'par_model.Rds')
 par = import('par_model.Rds')
 
