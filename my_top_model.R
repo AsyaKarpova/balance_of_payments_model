@@ -18,7 +18,8 @@ par_othg = par_model$par_othg
 par_imp_gds = par_model$par_imp_gds
 par_imp_serv = par_model$par_imp_serv
 par_exp_serv = par_model$par_exp_serv
-
+par_bal_wage = par_model$par_bal_wage
+par_rent_sinc = par_model$par_rent_sinc
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
@@ -65,8 +66,16 @@ pse0 = function(y, yhat) {
   return(sqrt(sum((y - yhat)^2)) / sum(y))
 }
 
+pse0_abs = function(y, yhat) {
+  return(sqrt(sum((y - yhat)^2)) / abs(sum(y)))
+}
+
 pse = function(pred, pred_quarter, real, real_quarter){
   return(pse0(yhat = pred, y = real) + pse0(yhat = pred_quarter, y = real_quarter))
+}
+
+pse_abs = function(pred, pred_quarter, real, real_quarter){
+  return(pse0_abs(yhat = pred, y = real) + pse0_abs(yhat = pred_quarter, y = real_quarter))
 }
 
 # MY OPTIMIZATION for oil model
@@ -325,12 +334,12 @@ make_pred_exp = function(par, X, R){
   r_hat_othg[1] = R[1,1]
   r_hat_othg[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:4]) * dummies[2:end]
   r_hat_othg_quarter = roll_sum(r_hat_othg, n = 3, by = 3) # рассчет квартальной выручки
-  r_hat_goods = X$r_hat_oog + r_hat_othg
-  r_hat_goods_quarter = roll_sum(r_hat_goods, n = 3, by = 3)
+  r_hat_gds = X$r_hat_oog + r_hat_othg
+  r_hat_gds_quarter = roll_sum(r_hat_gds, n = 3, by = 3)
   return(list(r_hat_othg = r_hat_othg, 
               r_hat_othg_quarter = r_hat_othg_quarter,
-              r_hat_goods = r_hat_goods, 
-              r_hat_goods_quater = r_hat_goods_quarter))
+              r_hat_gds = r_hat_gds, 
+              r_hat_gds_quater = r_hat_gds_quarter))
 }
 
 
@@ -338,8 +347,8 @@ error_opt_othg = function(par, X, R, R_quarter){
   frcst = make_pred_exp_othg(par, X, R)
   error_othg = pse(pred = frcst$r_hat_othg[1:96], pred_quarter = frcst$r_hat_othg_quarter,
                 real = R$r_exp_othg[1:96], real_quarter = R_quarter$r_exp_othg)
-  error_gds  = pse(pred = frcst$r_hat_goods[1:156], pred_quarter = frcst$r_hat_goods_quater,
-                    real = R$r_exp_goods[1:156], real_quarter = R_quarter$r_exp_goods)
+  error_gds  = pse(pred = frcst$r_hat_gds[1:156], pred_quarter = frcst$r_hat_gds_quater,
+                    real = R$r_exp_gds[1:156], real_quarter = R_quarter$r_exp_gds)
   error = error_gds + error_othg
 
   return(error)
@@ -350,14 +359,14 @@ pred_exp = make_pred_exp(par_othg, X, R)
 autoplot(ts.union(real_data = ts(prices$r_exp_othg[1:96], start = c(2006, 1), freq = 12),  
                   model = ts(pred_exp$r_hat_othg, start = c(2006, 1), freq = 12))) + ylab('revenue from export of other goods')
 autoplot(ts.union(real_data = ts(prices$r_exp_goods[1:156], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_exp$r_hat_goods, start = c(2006, 1), freq = 12))) + ylab('revenue from export of all goods')
+                  model = ts(pred_exp$r_hat_gds, start = c(2006, 1), freq = 12))) + ylab('revenue from export of all goods')
 
-r_hat_othg = pred_exp$r_hat_othg[1:96]
-r_hat_goods = pred_exp$r_hat_goods[1:156]
+r_hat_othg = pred_exp$r_hat_othg
+r_hat_gds = pred_exp$r_hat_gds
 
 
-MAPE(r_hat_othg, prices$r_exp_othg[1:96])
-MAPE(r_hat_goods, prices$r_exp_goods[1:156])
+MAPE(r_hat_othg[1:96], prices$r_exp_othg[1:96])
+MAPE(r_hat_gds[1:156], prices$r_exp_goods[1:156])
 
 
 # Model for goods import (ПРОГНОЗИРУЕМ НАЗАД!!!!) (r_imp_goods^ + r_imp_serv^ + r_imp_all^)
@@ -366,7 +375,7 @@ par = par_imp_gds
 X = tibble(consump_defl = lag(prices$n_c, 1)[1:end]/prices$rub_usd_1[1:end],
            j_defl = lag(prices$n_j, 1)[1:end]/prices$rub_usd_1[1:end],
            ds_defl = (prices$n_ds_1)[1:end]/prices$rub_usd_1[1:end],
-           r_hat_goods = r_hat_goods)
+           r_hat_gds = r_hat_gds)
 
 R = prices %>% 
         select(r_imp_goods, r_imp_serv, r_imp_all)
@@ -385,7 +394,7 @@ make_pred_imp = function(par, X, R){
   r_hat_imp_gds[1] = R[1,1]
   r_hat_imp_gds[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[2:5]) * dummies_gds[2:end] + par[1]
   r_hat_imp_gds_quarter = roll_sum(r_hat_imp_gds, n = 3, by = 3)
-  X_serv = select(X, -r_hat_goods) %>% mutate(r_hat_imp_gds = r_hat_imp_gds)
+  X_serv = select(X, -r_hat_gds) %>% mutate(r_hat_imp_gds = r_hat_imp_gds)
   dummies_serv = rep(c(par[22:27], 1, par[28:32]), 13)
   r_hat_imp_serv = rep(0, nrow(X_serv))
   r_hat_imp_serv[2:end] = (as.matrix(X_serv[2:nrow(X_serv), ]) %*% par[18:21]) * dummies_serv[2:end] + par[17]
@@ -439,7 +448,7 @@ MAPE(r_hat_imp_all[73:156], prices$r_imp_all[73:156])
 
 par = par_exp_serv
 X = tibble(const = 1,
-           r_hat_goods = r_hat_goods,
+           r_hat_gds = r_hat_gds,
            r_hat_imp_serv = r_hat_imp_serv)
 
 
@@ -459,7 +468,6 @@ make_pred_exp_serv = function(par, X, R){
               r_hat_exp_serv_quarter = r_hat_exp_serv_quarter))
 }
 
-### CHECK
 error_opt_exp_serv= function(par, X, R, R_quarter){
   frcst = make_pred_exp_serv(par, X, R)
   error = pse(pred = frcst$r_hat_exp_serv[73:156], pred_quarter = frcst$r_hat_exp_serv_quarter[2:52],
@@ -468,8 +476,71 @@ error_opt_exp_serv= function(par, X, R, R_quarter){
 }
 
 
-par_imp = c(p
+par_exp_serv = par_exp_serv
+pred_exp_serv = make_pred_exp_serv(par_exp_serv, X, R)
+autoplot(ts.union(real_data = ts(prices$r_exp_serv, start = c(2006, 1), freq = 12),  
+                  model = ts(pred_exp_serv$r_hat_exp_serv, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
 
+r_hat_exp_serv = pred_exp_serv$r_hat_exp_serv
+
+MAPE(r_hat_exp_serv[73:156], prices$r_exp_serv[73:156])
+
+
+
+r_hat_exp_all = r_hat_exp_serv + r_hat_gds
+r_hat_exp_all_quarter = c(NA, roll_sum(r_hat_exp_all[4:156], n = 3, by = 3))
+
+
+r_hat_bal_trade = r_hat_gds - r_hat_imp_gds
+r_hat_bal_trade_quarter = roll_sum(r_hat_bal_trade, n = 3, by = 3)
+
+
+r_hat_bal_serv = r_hat_exp_serv - r_hat_imp_serv
+r_hat_bal_serv_quarter = roll_sum(r_hat_bal_serv, n = 3, by = 3)
+
+
+#### model for balance of wages
+
+par = par_bal_wage
+
+X = tibble(const = 1,
+           r_hat_oil = r_hat_oil,
+           r_hat_othg = r_hat_othg,
+           r_hat_exp_serv = r_hat_exp_serv,
+           r_hat_imp_serv = r_hat_imp_serv)
+
+
+R = prices %>% 
+  select(r_bal_wage)
+
+R_quarter = prices_quater %>% 
+  select(r_bal_wage) %>% na.omit()
+length(par)
+
+make_pred_bal_wage = function(par, X, R){
+  dummies = rep(c(par[6:11], 1, par[12:16]), 13)
+  r_hat_bal_wage = rep(NA, nrow(X))
+  r_hat_bal_wage[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:5]) * dummies[2:end]
+  r_hat_bal_wage_quarter = roll_sum(r_hat_bal_wage, n = 3, by = 3) # рассчет квартальной выручки
+  return(list(r_hat_bal_wage = r_hat_bal_wage, 
+              r_hat_bal_wage_quarter = r_hat_bal_wage_quarter))
+}
+
+
+error_opt_bal_wage = function(par, X, R, R_quarter){
+  frcst = make_pred_bal_wage(par, X, R)
+  error = pse_abs(pred = frcst$r_hat_bal_wage[73:156], pred_quarter = frcst$r_hat_bal_wage_quarter[2:52],
+                      real = R$r_bal_wage[73:156], real_quarter = R_quarter$r_bal_wage[2:52])
+  return(error)
+}
+
+
+pred_bal_wage = make_pred_bal_wage(par_bal_wage, X, R)
+autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 12),  
+                  model = ts(pred_bal_wage$r_hat_bal_wage, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
+
+r_hat_bal_wage = pred_bal_wage$r_hat_bal_wage
+MAPE(r_hat_bal_wage[73:156], prices$r_bal_wage[73:156])
 
 par_oil = c(-0.002649611,
               0.002994676,
@@ -608,9 +679,48 @@ par_exp_serv = c(1.835400425,
                0.957568178,
                1.08019597)
 
+par_bal_wage = c(0.359017988,
+                 -0.104453068,
+                 0.059944624,
+                 -0.233723366,
+                 0.058128175,
+                  0.845030902,
+                  0.851455153,
+                  0.83767428,
+                  0.890423198,
+                  0.865324334,
+                  0.821820415,
+                  1.139716096,
+                  1.166461168,
+                  1.107022578,
+                  1.259722863,
+                  1.057434429)
+
+par_rent_sinc =c(0.374874168,
+                 -0.324972905,
+                 0.015547373,
+                 0.713948752,
+                 1.005337505,
+                 1.111242913,
+                 0.860500913,
+                 0.849931525,
+                 -0.202181588,
+                 1.06896146,
+                 1.37167092,
+                 1.280343957,
+                 1.343229192,
+                 0.535901919)
+              
+
+
+
+
+
 
 par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg = par_othg,
-                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_exp_serv = par_exp_serv)
+                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_exp_serv = par_exp_serv,
+                 par_bal_wage = par_bal_wage, 
+                 par_rent_sinc = par_rent_sinc)
 export(par_model, 'par_model.Rds')
 par = import('par_model.Rds')
 
