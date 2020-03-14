@@ -6,6 +6,8 @@ library(MLmetrics)
 library(GenSA)
 library(stats)
 
+library(Metrics)
+
 prices = import('data_month.xlsx')
 prices_quater = import('data_quarter.xlsx')
 par_model = import('par_model.Rds')
@@ -144,9 +146,9 @@ autoplot(ts.union(real_data = ts(prices$p_exp_oil[1:end], start = c(2006, 1), fr
                   model = ts(pred_oil$p_hat_oil, start = c(2006, 1), freq = 12))) + ylab('p_exp_oil')
 
 autoplot(ts.union(real_data = ts(prices$v_exp_oil[1:end], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_oil$v_hat_oil, start = c(2006, 1), freq = 12))) + ylab('v_exp_oil')
+                  model = ts(pred_oil$v_hat_oil, start = c(2006, 1), freq = 12))) + ylab('v_exp_oil') + ggtitle('Average volume of oil exported')
 autoplot(ts.union(real_data = ts(prices$r_exp_oil[1:end], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_oil$r_hat_oil, start = c(2006, 1), freq = 12))) + ylab('r_exp_oil')
+                  model = ts(pred_oil$r_hat_oil, start = c(2006, 1), freq = 12)),size=1) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
       
 MAPE(pred_oil$v_hat_oil[1:96], prices$v_exp_oil[1:96])
 MAPE(pred_oil$r_hat_oil[1:96], prices$r_exp_oil[1:96])
@@ -318,7 +320,7 @@ par = par_othg
 
 X = tibble(const = 1, 
            r_hat_oog = r_hat_gas + r_hat_oil + r_hat_op, 
-           r_hat_good_dum = r_hat_oog * prices$dum_1114[1:end],
+           r_hat_oog_dum = r_hat_oog * prices$dum_1114[1:end],
            gpd_defl = lag(prices$n_y, 1)[1:end] / prices$rub_usd_1[1:end])
 
 R = prices %>% select(r_exp_othg, r_exp_goods)
@@ -430,7 +432,7 @@ pred_imp = make_pred_imp(par_imp, X, R)
 autoplot(ts.union(real_data = ts(prices$r_imp_goods, start = c(2006, 1), freq = 12),  
                   model = ts(pred_imp$r_hat_imp_gds, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
 autoplot(ts.union(real_data = ts(prices$r_imp_serv[1:156], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_imp$r_hat_imp_serv, start = c(2006, 1), freq = 12))) + ylab('revenue from import of services')
+                  model = ts(pred_imp$r_hat_imp_serv, start = c(2006, 1), freq = 12)), size=1) + ggtitle('Average revenue from import of services') + ylab('revenue') +xlab('')
 autoplot(ts.union(real_data = ts(prices$r_imp_all[1:156], start = c(2006, 1), freq = 12),  
                   model = ts(pred_imp$r_imp_all, start = c(2006, 1), freq = 12))) + ylab('revenue from all import')
 
@@ -470,8 +472,8 @@ make_pred_exp_serv = function(par, X, R){
 
 error_opt_exp_serv= function(par, X, R, R_quarter){
   frcst = make_pred_exp_serv(par, X, R)
-  error = pse(pred = frcst$r_hat_exp_serv[73:156], pred_quarter = frcst$r_hat_exp_serv_quarter[2:52],
-                      real = R$r_exp_serv[73:156], real_quarter = R_quarter$r_exp_serv[2:52])
+  error = pse(pred = frcst$r_hat_exp_serv[73:end], pred_quarter = frcst$r_hat_exp_serv_quarter[2:52],
+                      real = R$r_exp_serv[73:end], real_quarter = R_quarter$r_exp_serv[2:52])
   return(error)
 }
 
@@ -483,12 +485,12 @@ autoplot(ts.union(real_data = ts(prices$r_exp_serv, start = c(2006, 1), freq = 1
 
 r_hat_exp_serv = pred_exp_serv$r_hat_exp_serv
 
-MAPE(r_hat_exp_serv[73:156], prices$r_exp_serv[73:156])
+MAPE(r_hat_exp_serv[73:end], prices$r_exp_serv[73:end])
 
 
 
 r_hat_exp_all = r_hat_exp_serv + r_hat_gds
-r_hat_exp_all_quarter = c(NA, roll_sum(r_hat_exp_all[4:156], n = 3, by = 3))
+r_hat_exp_all_quarter = c(NA, roll_sum(r_hat_exp_all[4:end], n = 3, by = 3))
 
 
 r_hat_bal_trade = r_hat_gds - r_hat_imp_gds
@@ -540,7 +542,61 @@ autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 1
                   model = ts(pred_bal_wage$r_hat_bal_wage, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
 
 r_hat_bal_wage = pred_bal_wage$r_hat_bal_wage
-MAPE(r_hat_bal_wage[73:156], prices$r_bal_wage[73:156])
+# as there are null values
+mase(r_hat_bal_wage[73:156], prices$r_bal_wage[73:156])
+smape(r_hat_bal_wage[73:156], prices$r_bal_wage[73:156])
+
+
+#### model for balance of rent and secondary income
+
+par = par_rent_sinc 
+
+X = tibble(const = 1,
+           r_hat_exp_serv = r_hat_exp_serv,
+           r_hat_gds = r_hat_gds)
+
+prices %>% 
+  select(r_bal_rent, r_bal_sinc)
+
+R = prices %>% 
+  select(r_bal_rent, r_bal_sinc) %>% 
+  mutate(r_bal_rent_sinc = r_bal_rent + r_bal_sinc) %>%
+  select(r_bal_rent_sinc)
+
+R_quarter = prices_quater %>% 
+  select(r_bal_rent, r_bal_sinc) %>% 
+  mutate(r_bal_rent_sinc = r_bal_rent + r_bal_sinc) %>%
+  select(r_bal_rent_sinc) %>% na.omit()
+
+make_pred_rent_sinc = function(par, X, R){
+  dummies = rep(c(par[4:9], 1, par[10:14]), 13)
+  r_hat_rent_sinc = rep(NA, nrow(X))
+  r_hat_rent_sinc[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:3]) * dummies[2:end]
+  r_hat_rent_sinc_quarter = roll_sum(r_hat_rent_sinc, n = 3, by = 3) # рассчет квартальной выручки
+  return(list(r_hat_rent_sinc = r_hat_rent_sinc, 
+              r_hat_rent_sinc_quarter = r_hat_rent_sinc_quarter))
+}
+
+error_opt_rent_sinc = function(par, X, R, R_quarter){
+  frcst = make_pred_rent_sinc(par, X, R)
+  error = pse_abs(pred = frcst$r_hat_rent_sinc[73:end], pred_quarter = frcst$r_hat_rent_sinc_quarter[2:52],
+                  real = R$r_bal_rent_sinc[73:end], real_quarter = R_quarter$r_bal_rent_sinc[2:52])
+  error
+  return(error)
+}
+
+
+pred_rent_sinc = make_pred_rent_sinc(par_rent_sinc, X, R)
+autoplot(ts.union(real_data = ts(prices$r_bal_rent + prices$r_bal_sinc, start = c(2006, 1), freq = 12),  
+                  model = ts(pred_rent_sinc$r_hat_rent_sinc, start = c(2006, 1), freq = 12))) + ylab('balance of rent and sinc')
+
+r_hat_rent_sinc= pred_rent_sinc$r_hat_rent_sinc
+
+MAPE(r_hat_rent_sinc[73:156], (prices$r_bal_rent + prices$r_bal_sinc)[73:156])
+mase(r_hat_rent_sinc[73:156], (prices$r_bal_rent + prices$r_bal_sinc)[73:156])
+smape(r_hat_rent_sinc[73:156], (prices$r_bal_rent + prices$r_bal_sinc)[73:156])
+
+
 
 par_oil = c(-0.002649611,
               0.002994676,
@@ -724,3 +780,38 @@ par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg
 export(par_model, 'par_model.Rds')
 par = import('par_model.Rds')
 
+
+tail(for_plot)
+names(for_plot)
+for_plot = import('structure.csv')
+plot_spread = gather(for_plot, key = 'date', value = 'Value', `01.01.2000`:`01.04.2019`)
+plot_spread$date = parse_date_time(plot_spread$date, orders = 'dmY')
+plot_spread$V1 %>% unique()
+plot_spread$V1 %>% unique()
+
+structure = filter(plot_spread,
+                   V1 != 'Current Account', V1 != 'Financial Account', V1 != 'Capital Account', V1 != 'Balance on Rent',
+                     V1 != 'Financial Account', V1 != 'Net Errors and Omissions', V1 != 'Reserves and Related Items')
+structure
+
+ggplot(structure, aes(x = date, y = Value)) + 
+  geom_line(color = 'red') + facet_wrap(.~V1) + xlab('') +ggtitle('Components of the Current Account')
+
+cur_acc = filter(plot_spread, V1 == 'Current Account') %>% 
+  ungroup()
+
+fin_acc = filter(plot_spread, V1 == 'Financial Account') %>% 
+  ungroup()
+
+cap_acc = filter(plot_spread, V1 == 'Capital Account') %>% 
+  ungroup()
+
+fin_acc
+cur_acc$date = parse_date_time(cur_acc$date, orders = 'dmY')
+fin_acc$date = parse_date_time(fin_acc$date, orders = 'dmY')
+cap_acc$date = parse_date_time(cap_acc$date, orders = 'dmY')
+cur_acc %>% head()
+ggplot(cur_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Current account')
+ggplot(fin_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Financial account')
+ggplot(cap_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Capital account')
+ggplot(fin_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Current account')
