@@ -22,6 +22,7 @@ par_imp_serv = par_model$par_imp_serv
 par_exp_serv = par_model$par_exp_serv
 par_bal_wage = par_model$par_bal_wage
 par_rent_sinc = par_model$par_rent_sinc
+par_inv = par_model$par_inv
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
@@ -517,7 +518,7 @@ R = prices %>%
 
 R_quarter = prices_quater %>% 
   select(r_bal_wage) %>% na.omit()
-length(par)
+
 
 make_pred_bal_wage = function(par, X, R){
   dummies = rep(c(par[6:11], 1, par[12:16]), 13)
@@ -543,58 +544,105 @@ autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 1
 
 r_hat_bal_wage = pred_bal_wage$r_hat_bal_wage
 # as there are null values
-mase(r_hat_bal_wage[73:156], prices$r_bal_wage[73:156])
-smape(r_hat_bal_wage[73:156], prices$r_bal_wage[73:156])
+mase(r_hat_bal_wage[73:end], prices$r_bal_wage[73:end])
+smape(r_hat_bal_wage[73:end], prices$r_bal_wage[73:end])
 
 
-#### model for balance of rent and secondary income
+#### model for (1) balance of rent and secondary income; (2) investement; (3) wages
 
-par = par_rent_sinc 
-
-X = tibble(const = 1,
+X_rent_sinc = tibble(const = 1,
            r_hat_exp_serv = r_hat_exp_serv,
            r_hat_gds = r_hat_gds)
 
-prices %>% 
-  select(r_bal_rent, r_bal_sinc)
-
-R = prices %>% 
+R_rent_sinc = prices %>% 
   select(r_bal_rent, r_bal_sinc) %>% 
   mutate(r_bal_rent_sinc = r_bal_rent + r_bal_sinc) %>%
-  select(r_bal_rent_sinc)
+  select(r_bal_rent_sinc) %>% rename('r_real' = 'r_bal_rent_sinc')
 
-R_quarter = prices_quater %>% 
+R_rent_sinc_quarter = prices_quater %>% 
   select(r_bal_rent, r_bal_sinc) %>% 
   mutate(r_bal_rent_sinc = r_bal_rent + r_bal_sinc) %>%
-  select(r_bal_rent_sinc) %>% na.omit()
+  select(r_bal_rent_sinc) %>% 
+  rename('r_real' = 'r_bal_rent_sinc')%>%
+  na.omit()
 
-make_pred_rent_sinc = function(par, X, R){
-  dummies = rep(c(par[4:9], 1, par[10:14]), 13)
-  r_hat_rent_sinc = rep(NA, nrow(X))
-  r_hat_rent_sinc[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:3]) * dummies[2:end]
-  r_hat_rent_sinc_quarter = roll_sum(r_hat_rent_sinc, n = 3, by = 3) # рассчет квартальной выручки
-  return(list(r_hat_rent_sinc = r_hat_rent_sinc, 
-              r_hat_rent_sinc_quarter = r_hat_rent_sinc_quarter))
+make_pred_balances = function(par, X, R){
+  n_pred = ncol(X)
+  dummies = rep(c(par[(n_pred + 1): (n_pred + 6)], 1, par[(n_pred + 7):(n_pred + 11)]), 13)
+  r_hat = rep(NA, nrow(X))
+  r_hat[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:n_pred]) * dummies[2:end]
+  r_hat_quarter = roll_sum(r_hat, n = 3, by = 3) 
+  return(list(r_hat = r_hat, 
+              r_hat_quarter = r_hat_quarter))
 }
 
-error_opt_rent_sinc = function(par, X, R, R_quarter){
-  frcst = make_pred_rent_sinc(par, X, R)
-  error = pse_abs(pred = frcst$r_hat_rent_sinc[73:end], pred_quarter = frcst$r_hat_rent_sinc_quarter[2:52],
-                  real = R$r_bal_rent_sinc[73:end], real_quarter = R_quarter$r_bal_rent_sinc[2:52])
-  error
+error_opt_balances = function(par, X, R, R_quarter){
+  frcst = make_pred_balances(par, X, R)
+  error = pse_abs(pred = frcst$r_hat[73:end], pred_quarter = frcst$r_hat_quarter[2:52],
+                  real = R$r_real[73:end], real_quarter = R_quarter$r_real[2:52])
   return(error)
 }
 
-
-pred_rent_sinc = make_pred_rent_sinc(par_rent_sinc, X, R)
+pred_rent_sinc = make_pred_balances(par_rent_sinc, X_rent_sinc, R_rent_sinc)
 autoplot(ts.union(real_data = ts(prices$r_bal_rent + prices$r_bal_sinc, start = c(2006, 1), freq = 12),  
-                  model = ts(pred_rent_sinc$r_hat_rent_sinc, start = c(2006, 1), freq = 12))) + ylab('balance of rent and sinc')
+                  model = ts(pred_rent_sinc$r_hat, start = c(2006, 1), freq = 12))) + ylab('balance of rent and sinc')
 
-r_hat_rent_sinc= pred_rent_sinc$r_hat_rent_sinc
+r_hat_rent_sinc= pred_rent_sinc$r_hat
 
-MAPE(r_hat_rent_sinc[73:156], (prices$r_bal_rent + prices$r_bal_sinc)[73:156])
-mase(r_hat_rent_sinc[73:156], (prices$r_bal_rent + prices$r_bal_sinc)[73:156])
-smape(r_hat_rent_sinc[73:156], (prices$r_bal_rent + prices$r_bal_sinc)[73:156])
+MAPE(r_hat_rent_sinc[73:end], (prices$r_bal_rent + prices$r_bal_sinc)[73:end])
+mase(r_hat_rent_sinc[73:end], (prices$r_bal_rent + prices$r_bal_sinc)[73:end])
+smape(r_hat_rent_sinc[73:end], (prices$r_bal_rent + prices$r_bal_sinc)[73:end])
+
+# (2) model for the balance of investment
+
+X_inv = tibble(const = 1,
+           r_hat_bal_trade = r_hat_bal_trade,
+           r_hat_bal_serv = r_hat_bal_serv)
+
+R_inv = prices %>% 
+  select(r_bal_inv) %>%
+  rename('r_real' = 'r_bal_inv')
+
+R_inv_quarter = prices_quater %>% 
+  select(r_bal_inv) %>%
+  rename('r_real' = 'r_bal_inv')
+
+
+pred_inv = make_pred_balances(par_inv, X_inv, R_inv)
+autoplot(ts.union(real_data = ts(prices$r_bal_inv, start = c(2006, 1), freq = 12),  
+                  model = ts(pred_inv$r_hat, start = c(2006, 1), freq = 12))) + ylab('balance of income')
+
+r_hat_inv = pred_inv$r_hat
+
+MAPE(r_hat_inv[73:end], prices$r_bal_inv[73:156])
+
+
+# (3) balance of wages
+X_wage = tibble(const = 1,
+           r_hat_oil = r_hat_oil,
+           r_hat_othg = r_hat_othg,
+           r_hat_exp_serv = r_hat_exp_serv,
+           r_hat_imp_serv = r_hat_imp_serv)
+
+
+R_wage = prices %>% 
+  select(r_bal_wage) %>%
+  rename('r_real' = 'r_bal_wage')
+
+R_wage_quarter = prices_quater %>% 
+  select(r_bal_wage) %>%
+  rename('r_real' = 'r_bal_wage') %>%
+  na.omit()
+
+pred_wage = make_pred_balances(par_bal_wage, X_wage, R_wage)
+autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 12),  
+                  model = ts(pred_wage$r_hat, start = c(2006, 1), freq = 12))) + ylab('balance of rent and sinc')
+
+r_hat_wage= pred_wage$r_hat
+
+MAPE(r_hat_wage[73:end], prices$r_bal_wage[73:end])
+mase(r_hat_wage[73:end], prices$r_bal_wage[73:end])
+smape(r_hat_wage[73:end], prices$r_bal_wage[73:end])
 
 
 
@@ -766,6 +814,22 @@ par_rent_sinc =c(0.374874168,
                  1.280343957,
                  1.343229192,
                  0.535901919)
+
+
+par_inv = c(-0.037042181,
+            -0.081827446,
+            0.667868321,
+            0.530188797,
+            0.848909867,
+            0.887474478,
+            1.221844703,
+            1.114364998,
+            2.850092133,
+            0.781893301,
+            1.170634679,
+            0.977866141,
+            1.048185117,
+            1.706085333)
               
 
 
@@ -776,7 +840,8 @@ par_rent_sinc =c(0.374874168,
 par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg = par_othg,
                    par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_exp_serv = par_exp_serv,
                  par_bal_wage = par_bal_wage, 
-                 par_rent_sinc = par_rent_sinc)
+                 par_rent_sinc = par_rent_sinc,
+                 par_inv = par_inv)
 export(par_model, 'par_model.Rds')
 par = import('par_model.Rds')
 
