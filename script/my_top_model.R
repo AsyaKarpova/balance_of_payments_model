@@ -8,9 +8,9 @@ library(stats)
 
 library(Metrics)
 
-prices = import('data_month.xlsx')
-prices_quater = import('data_quarter.xlsx')
-par_model = import('par_model.Rds')
+prices = import('data/data_month.xlsx')
+prices_quater = import('data/data_quarter.xlsx')
+par_model = import('data/par_model.Rds')
 
 ### parameters from excel
 par_oil = par_model$par_oil
@@ -24,6 +24,8 @@ par_bal_wage = par_model$par_bal_wage
 par_rent_sinc = par_model$par_rent_sinc
 par_inv = par_model$par_inv
 par_errors = par_model$par_errors
+par_dif_res = par_model$par_dif_res_long
+par_dif_res_short = par_model$par_dif_res_short
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
@@ -60,8 +62,10 @@ prices = mutate(prices,
                 p_exp_oil_3 = lag(prices$p_exp_oil, 3),
                 rub_usd_eur_1 = rub_usd_1 * usd_eur_1,
                 r_rent_sinc = r_bal_rent + r_bal_sinc,
-                dif_usd_rub = (rub_usd_1 - rub_usd_2)/rub_usd_2,
-                dif_brent = brent - brent_1)
+                dif_usd_rub_ratio = (rub_usd_1 - rub_usd_2)/rub_usd_2,
+                dif_brent = brent - brent_1,
+                dif_usd_rub = rub_usd - rub_usd_1,
+                dif_usd_eur = usd_eur - usd_eur_1)
 
 prices$dif_brent[1] = 0
 
@@ -244,7 +248,7 @@ X = prices[1:end, ] %>%
          gas_europe,
          gas_lng_3, gas_lng_5,
          brent_1, brent_3, brent_5, brent_6, 
-         v_prod_gas, usd_eur, dif_usd_rub) 
+         v_prod_gas, usd_eur, dif_usd_rub_ratio) 
 
 R = prices[1:end, ] %>% 
   select(p_exp_gas, v_exp_gas, r_exp_gas)
@@ -262,7 +266,7 @@ make_pred_gas = function(par, X, R){
                p_hat_gas_1 = lag(p_hat_gas, 1),
                p_hat_gas_7 = lag(p_hat_gas, 7),
                usd_eur = X$usd_eur, 
-               dif_usd_rub = X$dif_usd_rub)
+               dif_usd_rub_ratio = X$dif_usd_rub_ratio)
   X_v_by_par = as.matrix(X_v) %*% par[10:15]
   dummies = rep(c(par[16:21], 1, par[22:26]), 13)
   v_hat_gas = rep(NA, nrow(X))
@@ -648,6 +652,7 @@ mase(r_hat_wage[73:end], prices$r_bal_wage[73:end])
 smape(r_hat_wage[73:end], prices$r_bal_wage[73:end])
 
 
+
 # model for erros
 X_errors = select(prices, const, dif_brent, dum01:dum12)
 
@@ -680,39 +685,325 @@ mase(r_hat_errors[73:end], prices$r_errors[73:end])
 smape(r_hat_errors[73:end], prices$r_errors[73:end])
 
 
+### models for difference of reserves
+r_hat_cap_acc = c(unlist(import('data/r_hat_cap_account.csv')[1,]))
+r_hat_cur_acc = r_hat_cap_acc[1:156] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_bal_wage
+r_hat_cur_acc = c(r_hat_cur_acc,rep(NaN, 12))
+
+X_difr = tibble(const=1,
+                ###r_hat_difr = 1,
+                dif_brent = prices$dif_brent, 
+                dif_brent_cor = (prices$dif_brent * prices$vcor)/(prices$rub_usd_1),
+                dif_brent_1 = prices$brent_1 - prices$brent_2,
+                dif_usd_rub = prices$dif_usd_rub,
+                dif_usd_rub_1 = prices$rub_usd_1 - prices$rub_usd_1,
+                dif_usd_eur = prices$dif_usd_eur,
+                r_hat_cur_acc = r_hat_cur_acc,
+                r_hat_cur_acc_1 = lag(r_hat_cur_acc, 1),
+                quarter = rep((prices_quater$r_dif_reserves)/3, each = 3))
+
+X_difr_dummy = cbind(X_difr, select(prices, dum01:dum12))
+
+R_dif_reserves = prices %>% 
+  select(r_dif_reserves) %>%
+  rename('r_real' = 'r_dif_reserves')
+
+R_dif_reserves = prices_quater %>% 
+  select(r_dif_reserves) %>%
+  rename('r_real' = 'r_dif_reserves') %>%
+  na.omit()
+
+fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1) {
+  len_filter = length(coefs)
+  init = rev(tail(first_values, len_filter))
+  vector = stats::filter(x = add_term, filter = coefs, method = "recursive",
+                         init = init)
+  vector = c(first_values, vector)
+  return(vector)
+}
+
+par_dif_res = par_model$par_dif_res_long
+par = par_dif_res
+ncol(X)
+length(par_dif_res)
+X = X_difr_dummy[3:168,]
+
+make_pred_dif_res = function(par, X){
+  add_term = as.matrix(X) %*% c(par[1:22])
+  r_hat_dif_res = fill_recursive(first_values = 13.3059, add_term = add_term,
+                                coefs = par[23])
+  r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) 
+  return(list(r_hat_errors = r_hat_errors, 
+              r_hat_errors_quarter = r_hat_errors_quarter))
+}
+add_term
+par_oil = c(-0.002649611,
+              0.002994676,
+              0.003762426,
+              10.80411621,
+              0.001935955,
+              -1.642223975,  
+              0.526563047,
+              0.910193853,
+              0.97407938,
+              1.017019325,
+              0.988074124,
+              1.003387379,
+              0.962717453,
+              0.98113109,
+              0.959367023,
+              1.046286405,
+              0.980265077,
+              1.030176065)
+
+par_gas = c(-0.016227812,
+            -0.051620962,
+            0.012070903,
+            0.004550939,
+            0.004138223,
+            0.000667546,
+            0.000222498,
+            0.000436952,
+            -0.000155105,
+            -9.417258386,
+            0.418671158,
+            -20.50709686,
+            9.32452048,
+            5.243157422,
+            -21.5521098,
+            0.924810863,
+            0.980330959,
+            0.800746361,
+            0.807327112,
+            0.938861461,
+            1.024199646,
+            0.960144564,
+            0.985051664,
+            0.848908983,
+            0.91513756,
+            0.972719699)
 
 
+par_op = c(0.021455161,
+           0.001086559,
+           0.0032033,
+           0.001482887,
+           0.000701422,
+           -4.289339137,
+           0.019229557,
+           0.658309357,
+           0.217390488,
+           0.896034396,
+           1.016929155,
+           1.133439858,
+           1.020017427,
+           1.117458467,
+           1.102230487,
+           1.005589886,
+           0.994274199,
+           1.053676796,
+           0.993775918,
+           1.090384854)
 
 
-for_plot = import('structure.csv')
-plot_spread = gather(for_plot, key = 'date', value = 'Value', `01.01.2000`:`01.04.2019`)
-plot_spread$date = parse_date_time(plot_spread$date, orders = 'dmY')
-plot_spread$V1 %>% unique()
-plot_spread$V1 %>% unique()
+par_othg = c(2.147388081,
+             0.180296573,
+             0.179039559,
+             0.040866914,
+             0.744895119,
+             0.882107635,
+             1.05233508,
+             1.04812429,
+             0.962667943,
+             0.960230991,
+             1.002860226,
+             1.050919469,
+             1.071683371,
+             1.049034852,
+             1.151747398)
+             
 
-structure = filter(plot_spread,
-                   V1 != 'Current Account', V1 != 'Financial Account', V1 != 'Capital Account', V1 != 'Balance on Rent',
-                     V1 != 'Financial Account', V1 != 'Net Errors and Omissions', V1 != 'Reserves and Related Items')
-structure
+par_imp_gds = c(1.049324006, 
+                0.015074535,
+                0.519047894,
+                0.324019778,
+                0.125191148,
+                0.688527214,
+                0.839136841,
+                0.941038374,
+                0.935851812,
+                0.892819078,
+                0.939531671,
+                0.981979958,
+                0.970953027,
+                1.041314847,
+                0.988000363,
+                1.068876725)
+                
+                
+par_imp_serv = c(0.319283562,
+               0.245707675,
+               -0.179028469,
+               0.124577229,
+               -0.193807357,
+               0.622087753,
+               0.584436033,
+               0.718042244,
+               0.75345585,
+               0.742137073,
+               0.867907353,
+               1.047074181,
+               0.830107646,
+               0.900416689,
+               0.697987397,
+               1.011055266)
 
-ggplot(structure, aes(x = date, y = Value)) + 
-  geom_line(color = 'red') + facet_wrap(.~V1) + xlab('') +ggtitle('Components of the Current Account')
 
-cur_acc = filter(plot_spread, V1 == 'Current Account') %>% 
-  ungroup()
+par_exp_serv = c(1.835400425,
+               0.012179729,
+               0.330359785,
+               0.9028616,
+               0.978315981,
+               0.976041317,
+               0.994301665,
+               0.989340012,
+               1.022732484,
+               0.926343089,
+               0.965758614,
+               0.995769699,
+               0.957568178,
+               1.08019597)
 
-fin_acc = filter(plot_spread, V1 == 'Financial Account') %>% 
-  ungroup()
+par_bal_wage = c(0.359017988,
+                 -0.104453068,
+                 0.059944624,
+                 -0.233723366,
+                 0.058128175,
+                  0.845030902,
+                  0.851455153,
+                  0.83767428,
+                  0.890423198,
+                  0.865324334,
+                  0.821820415,
+                  1.139716096,
+                  1.166461168,
+                  1.107022578,
+                  1.259722863,
+                  1.057434429)
 
-cap_acc = filter(plot_spread, V1 == 'Capital Account') %>% 
-  ungroup()
+par_rent_sinc =c(0.374874168,
+                 -0.324972905,
+                 0.015547373,
+                 0.713948752,
+                 1.005337505,
+                 1.111242913,
+                 0.860500913,
+                 0.849931525,
+                 -0.202181588,
+                 1.06896146,
+                 1.37167092,
+                 1.280343957,
+                 1.343229192,
+                 0.535901919)
 
 
-cur_acc$date = parse_date_time(cur_acc$date, orders = 'dmY')
-fin_acc$date = parse_date_time(fin_acc$date, orders = 'dmY')
-cap_acc$date = parse_date_time(cap_acc$date, orders = 'dmY')
+par_inv = c(-0.037042181,
+            -0.081827446,
+            0.667868321,
+            0.530188797,
+            0.848909867,
+            0.887474478,
+            1.221844703,
+            1.114364998,
+            2.850092133,
+            0.781893301,
+            1.170634679,
+            0.977866141,
+            1.048185117,
+            1.706085333)
+              
+par_errors = c(-0.268656711,
+               -0.045928344,
+               -2.245322059,
+               -0.058132154,
+               0.006440311,
+               1.608801704,
+               0.568254878,
+               0.524879154,
+               1.408741466,
+               -0.450781627,
+               0.324313862,
+               0.36223661,
+               -1.999760656)
 
-ggplot(cur_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Current account')
-ggplot(fin_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Financial account')
-ggplot(cap_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Capital account')
-ggplot(fin_acc, aes(y = Value, x = date)) + geom_line(colour = 'red', size=0.5) + xlab('') + ggtitle('Current account')
+par_dif_res_long = c(0.9255412,
+                     0.159525424,
+                     0.109144127,
+                     -0.672599129,
+                     0.150885438,
+                     -0.529688218,
+                     -0.474386585,
+                     -35.02701172,
+                     -0.384285341,
+                     0.203246249,
+                     0.794075682,
+        #dummy
+                     1.232661673,
+                     4.145030554,
+                     -0.79612462,
+                     0.26835764,
+                     0.779549363,
+                     -0.990841149,
+                     -2.979998157,
+                     -0.399225178,
+                     2.207450963,
+                     0.577016344,
+                     -0.711361663,
+                     -3.33251577)
+
+par_dif_res_short = c(1.446267094,
+                      0.193956975,
+                      -0.329231003,
+                      0.104140249,
+                      0.45203721,
+                      -0.354722165,
+                      25.23290968,
+                      0.271550721,
+                      -0.419336279,
+                      0.959184008,
+                      -0.460290563)
+
+par_rub_usd = c(0.007296222,
+                0.096013377,
+                0.331630027,
+                -0.70592926,
+                -6.416661093,
+                -0.001095364,
+                0.020056705,
+                -0.020056705,
+                -0.086216279,
+                0.763533367,
+                0.817577214)
+
+par_cur_purch = c(-0.526082393,
+                -0.223539427,
+                0.024824984,
+                0.184782157,
+                0.013932286)
+
+
+par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg = par_othg,
+                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_exp_serv = par_exp_serv,
+                 par_bal_wage = par_bal_wage, 
+                 par_rent_sinc = par_rent_sinc,
+                 par_errors = par_errors,
+                 par_inv = par_inv, 
+                 par_dif_res_long = par_dif_res_long, 
+                 par_dif_res_short = par_dif_res_short,
+                 par_cur_purch = par_cur_purch,
+                 par_rub_usd = par_rub_usd)
+
+length(par_model)
+export(par_model, 'par_model.Rds')
+par = import('par_model.Rds')
+
