@@ -10,7 +10,7 @@ library(Metrics)
 
 prices = import('data/data_month.xlsx')
 prices_quater = import('data/data_quarter.xlsx')
-par_model = import('data/par_model.Rds')
+par_model = import('par_model.Rds')
 
 ### parameters from excel
 par_oil = par_model$par_oil
@@ -26,6 +26,7 @@ par_inv = par_model$par_inv
 par_errors = par_model$par_errors
 par_dif_res = par_model$par_dif_res_long
 par_dif_res_short = par_model$par_dif_res_short
+par_cur_purch = par_model$par_cur_purch
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
@@ -67,7 +68,9 @@ prices = mutate(prices,
                 dif_usd_rub = rub_usd - rub_usd_1,
                 dif_usd_eur = usd_eur - usd_eur_1)
 
+
 prices$dif_brent[1] = 0
+
 
 end = 156 # number of months with full gas, oil, op data
 
@@ -379,9 +382,8 @@ MAPE(r_hat_othg[1:96], prices$r_exp_othg[1:96])
 MAPE(r_hat_gds[1:156], prices$r_exp_goods[1:156])
 
 
-# Model for goods import (ПРОГНОЗИРУЕМ НАЗАД!!!!) (r_imp_goods^ + r_imp_serv^ + r_imp_all^)
+# Model for goods import (restore monthly data!!!!) (r_imp_goods^ + r_imp_serv^ + r_imp_all^)
 
-par = par_imp_gds
 X = tibble(consump_defl = lag(prices$n_c, 1)[1:end]/prices$rub_usd_1[1:end],
            j_defl = lag(prices$n_j, 1)[1:end]/prices$rub_usd_1[1:end],
            ds_defl = (prices$n_ds_1)[1:end]/prices$rub_usd_1[1:end],
@@ -509,50 +511,6 @@ r_hat_bal_serv = r_hat_exp_serv - r_hat_imp_serv
 r_hat_bal_serv_quarter = roll_sum(r_hat_bal_serv, n = 3, by = 3)
 
 
-#### model for balance of wages
-
-par = par_bal_wage
-
-X = tibble(const = 1,
-           r_hat_oil = r_hat_oil,
-           r_hat_othg = r_hat_othg,
-           r_hat_exp_serv = r_hat_exp_serv,
-           r_hat_imp_serv = r_hat_imp_serv)
-
-
-R = prices %>% 
-  select(r_bal_wage)
-
-R_quarter = prices_quater %>% 
-  select(r_bal_wage) %>% na.omit()
-
-
-make_pred_bal_wage = function(par, X, R){
-  dummies = rep(c(par[6:11], 1, par[12:16]), 13)
-  r_hat_bal_wage = rep(NA, nrow(X))
-  r_hat_bal_wage[2:end] = (as.matrix(X[2:nrow(X), ]) %*% par[1:5]) * dummies[2:end]
-  r_hat_bal_wage_quarter = roll_sum(r_hat_bal_wage, n = 3, by = 3) # рассчет квартальной выручки
-  return(list(r_hat_bal_wage = r_hat_bal_wage, 
-              r_hat_bal_wage_quarter = r_hat_bal_wage_quarter))
-}
-
-
-error_opt_bal_wage = function(par, X, R, R_quarter){
-  frcst = make_pred_bal_wage(par, X, R)
-  error = pse_abs(pred = frcst$r_hat_bal_wage[73:156], pred_quarter = frcst$r_hat_bal_wage_quarter[2:52],
-                      real = R$r_bal_wage[73:156], real_quarter = R_quarter$r_bal_wage[2:52])
-  return(error)
-}
-
-
-pred_bal_wage = make_pred_bal_wage(par_bal_wage, X, R)
-autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 12),  
-                  model = ts(pred_bal_wage$r_hat_bal_wage, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
-
-r_hat_bal_wage = pred_bal_wage$r_hat_bal_wage
-# as there are null values
-mase(r_hat_bal_wage[73:end], prices$r_bal_wage[73:end])
-smape(r_hat_bal_wage[73:end], prices$r_bal_wage[73:end])
 
 
 #### model for (1) balance of rent and secondary income; (2) investement; (3) wages
@@ -646,7 +604,7 @@ autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 1
                   model = ts(pred_wage$r_hat, start = c(2006, 1), freq = 12))) + ylab('balance of rent and sinc')
 
 r_hat_wage = pred_wage$r_hat
-
+head(r_hat_wage)
 MAPE(r_hat_wage[73:end], prices$r_bal_wage[73:end])
 mase(r_hat_wage[73:end], prices$r_bal_wage[73:end])
 smape(r_hat_wage[73:end], prices$r_bal_wage[73:end])
@@ -673,6 +631,13 @@ make_pred_errors = function(par, X){
               r_hat_errors_quarter = r_hat_errors_quarter))
 }
 
+error_opt_errors = function(par, X, R, R_quarter){
+  frcst = make_pred_errors(par, X)
+  error = pse_abs(pred = frcst$r_hat[73:end], pred_quarter = frcst$r_hat_quarter[2:52],
+                  real = R$r_real[73:end], real_quarter = R_quarter$r_real[2:52])
+  return(error)
+}
+
 pred_erros = make_pred_errors(par_errors, X_errors)
 
 r_hat_errors = pred_erros$r_hat_errors
@@ -687,8 +652,10 @@ smape(r_hat_errors[73:end], prices$r_errors[73:end])
 
 ### models for difference of reserves
 r_hat_cap_acc = c(unlist(import('data/r_hat_cap_account.csv')[1,]))
-r_hat_cur_acc = r_hat_cap_acc[1:156] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_bal_wage
+# until 2018Q12
+r_hat_cur_acc = r_hat_cap_acc[1:end] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
 r_hat_cur_acc = c(r_hat_cur_acc,rep(NaN, 12))
+r_hat_cur_acc
 
 X_difr = tibble(const=1,
                 ###r_hat_difr = 1,
@@ -696,11 +663,14 @@ X_difr = tibble(const=1,
                 dif_brent_cor = (prices$dif_brent * prices$vcor)/(prices$rub_usd_1),
                 dif_brent_1 = prices$brent_1 - prices$brent_2,
                 dif_usd_rub = prices$dif_usd_rub,
-                dif_usd_rub_1 = prices$rub_usd_1 - prices$rub_usd_1,
+                dif_usd_rub_1 = prices$rub_usd_1 - prices$rub_usd_2,
                 dif_usd_eur = prices$dif_usd_eur,
                 r_hat_cur_acc = r_hat_cur_acc,
                 r_hat_cur_acc_1 = lag(r_hat_cur_acc, 1),
-                quarter = rep((prices_quater$r_dif_reserves)/3, each = 3))
+                quarter = rep((prices_quater$r_dif_reserves)/3, each = 3), 
+                r_cur_purch = prices$r_cur_purch,
+                r_cur_purch_1 = lag(prices$r_cur_purch, 1))
+
 
 X_difr_dummy = cbind(X_difr, select(prices, dum01:dum12))
 
@@ -708,302 +678,129 @@ R_dif_reserves = prices %>%
   select(r_dif_reserves) %>%
   rename('r_real' = 'r_dif_reserves')
 
-R_dif_reserves = prices_quater %>% 
+R_dif_reserves_quarter = prices_quater %>% 
   select(r_dif_reserves) %>%
   rename('r_real' = 'r_dif_reserves') %>%
   na.omit()
 
-fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1) {
-  len_filter = length(coefs)
-  init = rev(tail(first_values, len_filter))
-  vector = stats::filter(x = add_term, filter = coefs, method = "recursive",
-                         init = init)
-  vector = c(first_values, vector)
+fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1,
+                           multiplier = rep(1, length(add_term))) {
+  add_term = unlist(add_term)
+  multiplier = unlist(multiplier)
+  nsteps = length(add_term)
+  vector = c(first_values, rep(NA, nsteps))
+  for (i in 1:nsteps) {
+    recur = sum(rev(coefs) * vector[(i + length(first_values) - length(coefs)):(i + length(first_values) - 1)])
+    vector[i + length(first_values)] = multiplier[i] * (add_term[i] + recur)
+  }  
+  
   return(vector)
 }
 
+
 par_dif_res = par_model$par_dif_res_long
-par = par_dif_res
-ncol(X)
-length(par_dif_res)
-X = X_difr_dummy[3:168,]
+par_dr = c(par_model$par_dif_res_long, par_model$par_dif_res_short)
+par = c(par_model$par_dif_res_long, par_model$par_dif_res_short)
+
 
 make_pred_dif_res = function(par, X){
-  add_term = as.matrix(X) %*% c(par[1:22])
-  r_hat_dif_res = fill_recursive(first_values = 13.3059, add_term = add_term,
-                                coefs = par[23])
-  r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) 
-  return(list(r_hat_errors = r_hat_errors, 
-              r_hat_errors_quarter = r_hat_errors_quarter))
+  r_hat_dif_res = rep(NaN, end)
+  X_long = as.matrix(select(X, - r_cur_purch, -r_cur_purch_1))
+  add_term = X_long %*% c(par[1:22])
+  
+  r_hat_dif_res[4:end] = fill_recursive(first_values = 13.3059, add_term = add_term[5:end],
+                                coefs = par[23]) # from 2006m04 to 2018m12
+  r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) #from 2Q2006 to 4Q2018
+  
+  X_short = X %>% select( dum01:dum12, const, dif_brent, dif_brent_1, dif_usd_rub, dif_usd_rub_1,
+                          dif_usd_eur, r_hat_cur_acc, r_hat_cur_acc_1,
+                          r_cur_purch, r_cur_purch_1)
+  X_short_end = X_short[(109:end), ]
+  add_term_short = as.matrix(X_short_end) %*% c(par[11:22], par[25:34])
+  r_dif_res_short = fill_recursive(first_values = r_hat_dif_res[108], 
+                                       add_term = add_term_short,
+                                 coefs = par[24]) # from 2006m04 to 2018m12
+  
+  r_hat_dif_res_short = c(r_hat_dif_res[1:108], r_dif_res_short) #prediction from 2015m01
+  r_hat_dif_res_short_quarter = roll_sum(r_hat_dif_res_short, n = 3, by = 3) #from 2Q2006 to 4Q2018
+  
+  return(list(r_hat_dif_res = r_hat_dif_res, 
+              r_hat_dif_res_quarter = r_hat_dif_res_quarter,
+              r_hat_dif_res_short = r_hat_dif_res_short, 
+              r_hat_dif_res_short_quarter = r_hat_dif_res_short_quarter))
 }
-add_term
-par_oil = c(-0.002649611,
-              0.002994676,
-              0.003762426,
-              10.80411621,
-              0.001935955,
-              -1.642223975,  
-              0.526563047,
-              0.910193853,
-              0.97407938,
-              1.017019325,
-              0.988074124,
-              1.003387379,
-              0.962717453,
-              0.98113109,
-              0.959367023,
-              1.046286405,
-              0.980265077,
-              1.030176065)
 
-par_gas = c(-0.016227812,
-            -0.051620962,
-            0.012070903,
-            0.004550939,
-            0.004138223,
-            0.000667546,
-            0.000222498,
-            0.000436952,
-            -0.000155105,
-            -9.417258386,
-            0.418671158,
-            -20.50709686,
-            9.32452048,
-            5.243157422,
-            -21.5521098,
-            0.924810863,
-            0.980330959,
-            0.800746361,
-            0.807327112,
-            0.938861461,
-            1.024199646,
-            0.960144564,
-            0.985051664,
-            0.848908983,
-            0.91513756,
-            0.972719699)
+error_opt_dif_res = function(par, X, R, R_quarter){
+  frcst = make_pred_dif_res(par, X)
+  error_long = pse_abs(pred = frcst$r_hat_dif_res[73:length(frcst$r_hat_dif_res)], pred_quarter = frcst$r_hat_dif_res_quarter[2:52],
+                       real = R$r_real[73:length(frcst$r_hat_dif_res)], real_quarter = R_quarter$r_real[2:52])
+  pse0(frcst$r_hat_dif_res[73:length(frcst$r_hat_dif_res)],R$r_real[73:length(frcst$r_hat_dif_res)])
+  return(error)
+}
+
+pred_res = make_pred_dif_res(par_dr, X_difr_dummy)
+
+r_hat_dif_res = pred_res$r_hat_dif_res 
+r_hat_dif_res_quarter = pred_res$r_hat_dif_res_quarter
+r_hat_dif_res_short = pred_res$r_hat_dif_res_short
+r_hat_dif_res_short_quarter = pred_res$r_hat_dif_res_short_quarter
+
+autoplot(ts.union(real_data = ts(prices$r_dif_reserves, start = c(2006, 1), freq = 12),  
+                  model = ts(r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('difference in reserves')
+
+MAPE(r_hat_dif_res_short[73:(end)], prices$r_dif_reserves[73:(end)])
+
+length(r_hat_errors[5:156])
+r_hat_bal_fin = r_hat_errors[4:156] - r_hat_dif_res[1:153] + r_hat_cur_acc[4:156]
 
 
-par_op = c(0.021455161,
-           0.001086559,
-           0.0032033,
-           0.001482887,
-           0.000701422,
-           -4.289339137,
-           0.019229557,
-           0.658309357,
-           0.217390488,
-           0.896034396,
-           1.016929155,
-           1.133439858,
-           1.020017427,
-           1.117458467,
-           1.102230487,
-           1.005589886,
-           0.994274199,
-           1.053676796,
-           0.993775918,
-           1.090384854)
+autoplot(ts.union(real_data = ts(prices$r_bal_fin, start = c(2006, 1), freq = 12),  
+                  model = ts(r_hat_bal_fin, start = c(2006, 1), freq = 12))) + ylab('net errors and omissions')
 
 
-par_othg = c(2.147388081,
-             0.180296573,
-             0.179039559,
-             0.040866914,
-             0.744895119,
-             0.882107635,
-             1.05233508,
-             1.04812429,
-             0.962667943,
-             0.960230991,
-             1.002860226,
-             1.050919469,
-             1.071683371,
-             1.049034852,
-             1.151747398)
-             
 
-par_imp_gds = c(1.049324006, 
-                0.015074535,
-                0.519047894,
-                0.324019778,
-                0.125191148,
-                0.688527214,
-                0.839136841,
-                0.941038374,
-                0.935851812,
-                0.892819078,
-                0.939531671,
-                0.981979958,
-                0.970953027,
-                1.041314847,
-                0.988000363,
-                1.068876725)
-                
-                
-par_imp_serv = c(0.319283562,
-               0.245707675,
-               -0.179028469,
-               0.124577229,
-               -0.193807357,
-               0.622087753,
-               0.584436033,
-               0.718042244,
-               0.75345585,
-               0.742137073,
-               0.867907353,
-               1.047074181,
-               0.830107646,
-               0.900416689,
-               0.697987397,
-               1.011055266)
+### currency purchase model
 
 
-par_exp_serv = c(1.835400425,
-               0.012179729,
-               0.330359785,
-               0.9028616,
-               0.978315981,
-               0.976041317,
-               0.994301665,
-               0.989340012,
-               1.022732484,
-               0.926343089,
-               0.965758614,
-               0.995769699,
-               0.957568178,
-               1.08019597)
+X_cur = tibble(r_price_cur_purch = prices$r_price_cur_purch, 
+           brent = prices$brent, 
+           brent_1 = prices$brent_1, 
+           brent_2 = prices$brent_2,
+           r_dum_cur_purch = prices$r_dum_cur_purch)
+X = X_cur
+par = par_cur_purch
+R_cur = prices %>% 
+  select(r_cur_purch) %>%
+  rename('r_real' = 'r_cur_purch')
 
-par_bal_wage = c(0.359017988,
-                 -0.104453068,
-                 0.059944624,
-                 -0.233723366,
-                 0.058128175,
-                  0.845030902,
-                  0.851455153,
-                  0.83767428,
-                  0.890423198,
-                  0.865324334,
-                  0.821820415,
-                  1.139716096,
-                  1.166461168,
-                  1.107022578,
-                  1.259722863,
-                  1.057434429)
+R_cur_quarter = prices_quater %>% 
+  select(r_cur_purch) %>%
+  rename('r_real' = 'r_cur_purch') %>%
+  na.omit()
+ncol(X)
+make_pred_cur_purch = function(par, X){
+  r_hat_cur_purch = rep(0, end)
+  add_term = (as.matrix(X[3:end,1:4]) %*% par[1:4])
+  r_hat_cur_purch[2:end] = fill_recursive(add_term = add_term, multiplier = X[3:end,5], coefs = par[5])
+  r_hat_cur_purch_quarter = roll_sum(r_hat_cur_purch, n = 3, by = 3) # рассчет квартальной выручки
+  return(list(r_hat_cur_purch = r_hat_cur_purch, 
+              r_hat_cur_purch_quarter = r_hat_cur_purch_quarter))
+}
 
-par_rent_sinc =c(0.374874168,
-                 -0.324972905,
-                 0.015547373,
-                 0.713948752,
-                 1.005337505,
-                 1.111242913,
-                 0.860500913,
-                 0.849931525,
-                 -0.202181588,
-                 1.06896146,
-                 1.37167092,
-                 1.280343957,
-                 1.343229192,
-                 0.535901919)
+head(prices$r_cur_purch)
+pred_cur_purch = make_pred_cur_purch(par_cur_purch, X_cur)
+r_hat_cur_purch = pred_cur_purch$r_hat_cur_purch 
+r_hat_cur_purch_quarter = pred_cur_purch$r_hat_cur_purch_quarter
 
 
-par_inv = c(-0.037042181,
-            -0.081827446,
-            0.667868321,
-            0.530188797,
-            0.848909867,
-            0.887474478,
-            1.221844703,
-            1.114364998,
-            2.850092133,
-            0.781893301,
-            1.170634679,
-            0.977866141,
-            1.048185117,
-            1.706085333)
-              
-par_errors = c(-0.268656711,
-               -0.045928344,
-               -2.245322059,
-               -0.058132154,
-               0.006440311,
-               1.608801704,
-               0.568254878,
-               0.524879154,
-               1.408741466,
-               -0.450781627,
-               0.324313862,
-               0.36223661,
-               -1.999760656)
-
-par_dif_res_long = c(0.9255412,
-                     0.159525424,
-                     0.109144127,
-                     -0.672599129,
-                     0.150885438,
-                     -0.529688218,
-                     -0.474386585,
-                     -35.02701172,
-                     -0.384285341,
-                     0.203246249,
-                     0.794075682,
-        #dummy
-                     1.232661673,
-                     4.145030554,
-                     -0.79612462,
-                     0.26835764,
-                     0.779549363,
-                     -0.990841149,
-                     -2.979998157,
-                     -0.399225178,
-                     2.207450963,
-                     0.577016344,
-                     -0.711361663,
-                     -3.33251577)
-
-par_dif_res_short = c(1.446267094,
-                      0.193956975,
-                      -0.329231003,
-                      0.104140249,
-                      0.45203721,
-                      -0.354722165,
-                      25.23290968,
-                      0.271550721,
-                      -0.419336279,
-                      0.959184008,
-                      -0.460290563)
-
-par_rub_usd = c(0.007296222,
-                0.096013377,
-                0.331630027,
-                -0.70592926,
-                -6.416661093,
-                -0.001095364,
-                0.020056705,
-                -0.020056705,
-                -0.086216279,
-                0.763533367,
-                0.817577214)
-
-par_cur_purch = c(-0.526082393,
-                -0.223539427,
-                0.024824984,
-                0.184782157,
-                0.013932286)
+autoplot(ts.union(real_data = ts(prices$r_cur_purch, start = c(2006, 1), freq = 12),  
+                  model = ts(r_hat_cur_purch, start = c(2006, 1), freq = 12))) + ylab('net errors and omissions')
 
 
-par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op, par_othg = par_othg,
-                   par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_exp_serv = par_exp_serv,
-                 par_bal_wage = par_bal_wage, 
-                 par_rent_sinc = par_rent_sinc,
-                 par_errors = par_errors,
-                 par_inv = par_inv, 
-                 par_dif_res_long = par_dif_res_long, 
-                 par_dif_res_short = par_dif_res_short,
-                 par_cur_purch = par_cur_purch,
-                 par_rub_usd = par_rub_usd)
+### model for exchange rate
 
-length(par_model)
-export(par_model, 'par_model.Rds')
-par = import('par_model.Rds')
+X_rib_usd = tibble(const = 1, 
+                   )
+
+
 
