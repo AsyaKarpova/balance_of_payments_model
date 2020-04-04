@@ -6,7 +6,7 @@ library(GenSA)
 library(stats)
 library(Metrics)
 library(tidyverse)
-library(dplyr)
+
 
 prices = import('data/data_month.xlsx')
 prices_quater = import('data/data_quarter.xlsx')
@@ -826,17 +826,15 @@ R_rub_usd = prices %>%
   select(rub_usd) %>%
   rename('r_real' = 'rub_usd')
 
-R_rub_usd_quarter = prices_quater %>% 
-  select(rub_usd) %>%
-  rename('r_real' = 'rub_usd') %>%
-  na.omit()
+R_rub_usd_quarter = roll_mean(R_rub_usd$r_real, n = 3, by = 3)
+
 X = X_rub_usd
 par = par_rub_usd
 
 
 mask = matrix(0, 8, end)
 mask[1,] = c(rep(1,3), rep(0, 23),1,rep(c(rep(0,23), 1), times=7))[1:156]
-mask[2,] = c(rep(1,3), rep(0, 3),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[2,] = c(rep(1,3), rep(0, 2),1,rep(c(rep(0,23), 1), times=7))[1:156]
 mask[3,] = c(rep(1,3), rep(0, 5),1,rep(c(rep(0,23), 1), times=7))[1:156]
 mask[4,] = c(rep(1,3), rep(0, 8),1,rep(c(rep(0,23), 1), times=7))[1:156]
 mask[5,] = c(rep(1,3),rep(0, 11),1,rep(c(rep(0,23), 1), times=7))[1:156]
@@ -844,9 +842,9 @@ mask[6,] = c(rep(1,3),rep(0, 14),1,rep(c(rep(0,23), 1), times=7))[1:156]
 mask[7,] = c(rep(1,3),rep(0, 17),1,rep(c(rep(0,23), 1), times=7))[1:156]
 mask[8,] = c(rep(1,3),rep(0, 20),1,rep(c(rep(0,23), 1), times=7))[1:156]
 
-make_pred_rub_usd = function(par, X, R, mask){
+make_pred_rub_usd = function(par, X, R, R_rub_usd_quarter, mask){
   hat_rub_usd_ratio = rep(NaN, end)
-  hat_rub_usd_ratio[2:3] =X$dif_usd_rub_ratio[2:3] 
+  hat_rub_usd_ratio[2:3] = X$dif_usd_rub_ratio[2:3] 
   add_term = as.matrix(X[4:end,1:10]) %*% c(par[1:10])
   
   hat_rub_usd_ratio[3:end] = fill_recursive(first_values = hat_rub_usd_ratio[3], add_term = add_term,
@@ -855,9 +853,10 @@ make_pred_rub_usd = function(par, X, R, mask){
   hat_rub_usd = matrix(NaN, 8, end)
   hat_rub_usd[1:8, 1:3] = matrix(R_rub_usd[1:3,1], ncol = 3, nrow = 8, byrow = TRUE) 
   vector = 1 + hat_rub_usd_ratio
-  real_values = matrix(R_rub_usd[4:end,1], ncol = end-3, nrow = 8, byrow = TRUE)
+  real_values = matrix(R_rub_usd[1:end,1], ncol = end, nrow = 8, byrow = TRUE)
+
   for (i in 1:nrow(hat_rub_usd)) {
-    for (j in 4:ncol(hat_rub_usd[1:8, 4:end])) {
+    for (j in 4:ncol(hat_rub_usd)) {
       if (mask[i,j] == 0){
         hat_rub_usd[i,j] = hat_rub_usd[i, j-1] * vector[j]}
       else{
@@ -866,9 +865,16 @@ make_pred_rub_usd = function(par, X, R, mask){
       }
     }
   }
-
-
   
-  #prediction from 2015m01
-} #from 2Q2006 to 4Q2018
-real_values = matrix(R_rub_usd[1:end,1], 8, end, byrow=TRUE)
+  hat_rub_usd_final = colMeans(hat_rub_usd)
+  hat_rub_usd_quarter = roll_mean(hat_rub_usd_final, n = 3, by = 3)
+  
+  error_matrix = hat_rub_usd - real_values
+  error_month = apply(error_matrix, 1, pse0, y=real_values[1,])
+  error_month_mean = mean(error_month)
+ # error_quarter = pse0(y = R_rub_usd_quarter, yhat = hat_rub_usd_quarter)
+  return(list(hat_rub_usd_final = hat_rub_usd_final, 
+                    hat_rub_usd_quarter = hat_rub_usd_quarter,
+                    hat_rub_usd = hat_rub_usd))
+  }
+pred_rub_usd = make_pred_rub_usd(par_rub_usd, X_rub_usd,R_rub_usd, R_rub_usd_quarter, mask=mask)
