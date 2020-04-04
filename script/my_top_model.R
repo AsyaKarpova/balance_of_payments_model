@@ -1,16 +1,17 @@
 library(forecast)
 library(rio)
 library(RcppRoll) # for rolling window operations
-library(tidyverse)
 library(MLmetrics)
 library(GenSA)
 library(stats)
-
 library(Metrics)
+library(tidyverse)
+library(dplyr)
 
 prices = import('data/data_month.xlsx')
 prices_quater = import('data/data_quarter.xlsx')
 par_model = import('par_model.Rds')
+
 
 ### parameters from excel
 par_oil = par_model$par_oil
@@ -27,6 +28,7 @@ par_errors = par_model$par_errors
 par_dif_res = par_model$par_dif_res_long
 par_dif_res_short = par_model$par_dif_res_short
 par_cur_purch = par_model$par_cur_purch
+par_rub_usd = par_model$par_rub_usd
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
@@ -63,10 +65,18 @@ prices = mutate(prices,
                 p_exp_oil_3 = lag(prices$p_exp_oil, 3),
                 rub_usd_eur_1 = rub_usd_1 * usd_eur_1,
                 r_rent_sinc = r_bal_rent + r_bal_sinc,
-                dif_usd_rub_ratio = (rub_usd_1 - rub_usd_2)/rub_usd_2,
+                dif_usd_rub_ratio = (rub_usd - rub_usd_1)/rub_usd_1,
+                dif_usd_rub_ratio_1 = (rub_usd_1 - rub_usd_2)/rub_usd_2,
                 dif_brent = brent - brent_1,
                 dif_usd_rub = rub_usd - rub_usd_1,
-                dif_usd_eur = usd_eur - usd_eur_1)
+                dif_usd_eur = usd_eur - usd_eur_1, 
+                dif_em_index = em_index - lag(em_index, 1),
+                dif_em_index_ratio = dif_em_index/lag(em_index, 1),
+                dif_brent_ratio = dif_brent/brent_1,
+                dif_usd_eur_ratio = dif_usd_eur/usd_eur_1,
+                dif_r = rate_repo - rate_10tr,
+                dif_r_1 = lag(dif_r, 1))
+               
 
 
 prices$dif_brent[1] = 0
@@ -251,7 +261,7 @@ X = prices[1:end, ] %>%
          gas_europe,
          gas_lng_3, gas_lng_5,
          brent_1, brent_3, brent_5, brent_6, 
-         v_prod_gas, usd_eur, dif_usd_rub_ratio) 
+         v_prod_gas, usd_eur, dif_usd_rub_ratio_1) 
 
 R = prices[1:end, ] %>% 
   select(p_exp_gas, v_exp_gas, r_exp_gas)
@@ -269,7 +279,7 @@ make_pred_gas = function(par, X, R){
                p_hat_gas_1 = lag(p_hat_gas, 1),
                p_hat_gas_7 = lag(p_hat_gas, 7),
                usd_eur = X$usd_eur, 
-               dif_usd_rub_ratio = X$dif_usd_rub_ratio)
+               dif_usd_rub_ratio_1 = X$dif_usd_rub_ratio_1)
   X_v_by_par = as.matrix(X_v) %*% par[10:15]
   dummies = rep(c(par[16:21], 1, par[22:26]), 13)
   v_hat_gas = rep(NA, nrow(X))
@@ -767,8 +777,8 @@ X_cur = tibble(r_price_cur_purch = prices$r_price_cur_purch,
            brent_1 = prices$brent_1, 
            brent_2 = prices$brent_2,
            r_dum_cur_purch = prices$r_dum_cur_purch)
-X = X_cur
-par = par_cur_purch
+
+
 R_cur = prices %>% 
   select(r_cur_purch) %>%
   rename('r_real' = 'r_cur_purch')
@@ -777,7 +787,7 @@ R_cur_quarter = prices_quater %>%
   select(r_cur_purch) %>%
   rename('r_real' = 'r_cur_purch') %>%
   na.omit()
-ncol(X)
+
 make_pred_cur_purch = function(par, X){
   r_hat_cur_purch = rep(0, end)
   add_term = (as.matrix(X[3:end,1:4]) %*% par[1:4])
@@ -799,8 +809,66 @@ autoplot(ts.union(real_data = ts(prices$r_cur_purch, start = c(2006, 1), freq = 
 
 ### model for exchange rate
 
-X_rib_usd = tibble(const = 1, 
-                   )
+X_rub_usd = tibble(const = 1, 
+                   dif_brent_ratio = prices$dif_brent_ratio,
+                   dif_brent_ratio_1114 = prices$dum_1114 * dif_brent_ratio,
+                   dif_brent_ratio_cor = (prices$vcor*dif_brent_ratio)/prices$rub_usd_1, 
+                   dif_r_1114 = prices$dif_r * prices$dum_1114, 
+                   r_cur_purch = prices$r_cur_purch,
+                   r_cur_purch_1 = lag(prices$r_cur_purch, 1),
+                   dif_usd_eur_ratio = prices$dif_usd_eur_ratio,
+                   em_index_ratio = prices$dif_em_index_ratio,
+                   em_index_ratio_1114 = em_index_ratio * prices$dum_1114,
+                   dif_usd_rub_ratio = prices$dif_usd_rub_ratio)
+                               
+
+R_rub_usd = prices %>% 
+  select(rub_usd) %>%
+  rename('r_real' = 'rub_usd')
+
+R_rub_usd_quarter = prices_quater %>% 
+  select(rub_usd) %>%
+  rename('r_real' = 'rub_usd') %>%
+  na.omit()
+X = X_rub_usd
+par = par_rub_usd
 
 
+mask = matrix(0, 8, end)
+mask[1,] = c(rep(1,3), rep(0, 23),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[2,] = c(rep(1,3), rep(0, 3),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[3,] = c(rep(1,3), rep(0, 5),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[4,] = c(rep(1,3), rep(0, 8),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[5,] = c(rep(1,3),rep(0, 11),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[6,] = c(rep(1,3),rep(0, 14),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[7,] = c(rep(1,3),rep(0, 17),1,rep(c(rep(0,23), 1), times=7))[1:156]
+mask[8,] = c(rep(1,3),rep(0, 20),1,rep(c(rep(0,23), 1), times=7))[1:156]
 
+make_pred_rub_usd = function(par, X, R, mask){
+  hat_rub_usd_ratio = rep(NaN, end)
+  hat_rub_usd_ratio[2:3] =X$dif_usd_rub_ratio[2:3] 
+  add_term = as.matrix(X[4:end,1:10]) %*% c(par[1:10])
+  
+  hat_rub_usd_ratio[3:end] = fill_recursive(first_values = hat_rub_usd_ratio[3], add_term = add_term,
+                                            coefs = par[11]) # from 2006m04 to 2018m12
+  
+  hat_rub_usd = matrix(NaN, 8, end)
+  hat_rub_usd[1:8, 1:3] = matrix(R_rub_usd[1:3,1], ncol = 3, nrow = 8, byrow = TRUE) 
+  vector = 1 + hat_rub_usd_ratio
+  real_values = matrix(R_rub_usd[4:end,1], ncol = end-3, nrow = 8, byrow = TRUE)
+  for (i in 1:nrow(hat_rub_usd)) {
+    for (j in 4:ncol(hat_rub_usd[1:8, 4:end])) {
+      if (mask[i,j] == 0){
+        hat_rub_usd[i,j] = hat_rub_usd[i, j-1] * vector[j]}
+      else{
+                                           hat_rub_usd[i,j] = real_values[i,j]
+                                          
+      }
+    }
+  }
+
+
+  
+  #prediction from 2015m01
+} #from 2Q2006 to 4Q2018
+real_values = matrix(R_rub_usd[1:end,1], 8, end, byrow=TRUE)
