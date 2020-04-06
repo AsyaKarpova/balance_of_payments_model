@@ -110,11 +110,11 @@ pse_abs = function(pred, pred_quarter, real, real_quarter){
 # MY OPTIMIZATION for oil model
 par = par_oil
 
-X = prices[1:end_2018, ] %>% 
+X_oil = prices[1:end_2018, ] %>% 
   select(const, brent, brent_1, rub_usd_1) 
-R = prices[1:end_2018, ] %>% 
+R_oil = prices[1:end_2018, ] %>% 
   select(p_exp_oil, v_exp_oil, r_exp_oil)
-R_quarter = prices_quater %>%
+R_oil_quarter = prices_quater %>%
   select(p_exp_oil, v_exp_oil, r_exp_oil) %>% na.omit()
 
 make_pred_oil = function(par, X, R){
@@ -153,21 +153,21 @@ error_opt_oil = function(par, X, R, R_quarter){
 }
 
 
-#par_0 = c(rep(0.02, 7), rep(0.91, 11))
+par_0 = c(rep(0.02, 7), rep(0.91, 11))
 
 #result = optim(par = par_0, X = X, R = R, R_quarter = R_quarter,
 #               fn = error_opt_oil, 
  #              method = 'L-BFGS-B')
 
-#result_sa = GenSA(lower = rep(-1, 18),
- #                 upper = rep(1.9, 18),
-  #                fn = error_opt_oil,
-   #               X = X, R = R, R_quarter = R_quarter,
-    #              control = list(verbose = TRUE, max.time = 300))
+result_sa = GenSA(lower = rep(-1, 18),
+                upper = rep(1.9, 18),
+                fn = error_opt_oil,
+                  X = X_oil, R = R_oil, R_quarter = R_oil_quarter,
+              control = list(verbose = TRUE, max.time = 300))
 
-#par_oil = result_sa$par
+par_oil = result_sa$par
 
-pred_oil = make_pred_oil(par_oil, X, R)
+pred_oil = make_pred_oil(par_oil, X_oil, R_oil)
 
 autoplot(ts.union(real_data = ts(prices$p_exp_oil[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_oil$p_hat_oil, start = c(2006, 1), freq = 12))) + ylab('p_exp_oil')
@@ -189,15 +189,15 @@ r_hat_oil_quarter = pred_oil$r_hat_oil_quarter
 # MY OPTIMIZATION for oil product model
 
 par = par_op
-X = prices[1:end_2018, ] %>% 
+X_op = prices[1:end_2018, ] %>% 
   select(const,
          brent, brent_1, brent_2, brent_3, 
          rub_usd_eur_1, v_prod_op_1) 
 
-R = prices[1:end_2018, ] %>% 
+R_op = prices[1:end_2018, ] %>% 
   select(p_exp_op, v_exp_op, r_exp_op)
 
-R_quarter = prices_quater %>% 
+R_op_quarter = prices_quater %>% 
   select(p_exp_op, v_exp_op, r_exp_op) %>% na.omit()
 
 
@@ -239,13 +239,15 @@ error_opt_op = function(par, X, R, R_quarter){
   return(error_p + error_v + error_r)
 }
 
-#result = optim(par = rep(0.02, 20), X = X, R = R, R_quarter = R_quarter,
- #              fn = error_opt_op, 
-  #             method = 'L-BFGS-B')
+par_0 = c(rep(0.02, 9), rep(0.91, 11))
+result_sa = GenSA(lower = rep(-1, length(par_0)),
+                  upper = rep(1.9, length(par_0)),
+                  fn = error_opt_op,
+                  X = X_op, R = R_op, R_quarter = R_op_quarter,
+                  control = list(verbose = TRUE, max.time = 300))
+par_op = result_sa$par
 
-#par_op = result$par
-
-pred_op = make_pred_op(par_op, X, R)
+pred_op = make_pred_op(par_op, X_op, R_op)
 autoplot(ts.union(real_data = ts(prices$p_exp_op[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_op$p_hat_op, start = c(2006, 1), freq = 12))) + ylab('p_exp_op')
 autoplot(ts.union(real_data = ts(prices$v_exp_op[1:end_2018], start = c(2006, 1), freq = 12),  
@@ -262,17 +264,17 @@ r_hat_op_quarter = pred_op$r_hat_op_quarter
 
 ### optimization for gas model
 par = par_gas
-X = prices[1:end_2018, ] %>% 
+X_gas = prices[1:end_2018, ] %>% 
   select(const, dum_2012,
          gas_europe,
          gas_lng_3, gas_lng_5,
          brent_1, brent_3, brent_5, brent_6, 
          v_prod_gas, usd_eur, dif_usd_rub_ratio_1) 
 
-R = prices[1:end_2018, ] %>% 
+R_gas = prices[1:end_2018, ] %>% 
   select(p_exp_gas, v_exp_gas, r_exp_gas)
 
-R_quarter = prices_quater %>% 
+R_gas_quarter = prices_quater %>% 
   select(p_exp_gas, v_exp_gas, r_exp_gas) %>% na.omit()
 
 
@@ -315,18 +317,22 @@ error_opt_gas = function(par, X, R, R_quarter){
 }
 
 
-#result = optim(par = c(rep(0.02, 15), rep(0.99, 11)), X = X, R = R, R_quarter = R_quarter,
- #              fn = error_opt_gas, 
-  #             method = 'L-BFGS-B')
 
-#result_sa = GenSA(lower = rep(-1, 18),
- #                 upper = rep(1.9, 18),
-  #                fn = error_opt_gas,
-   #               X = X, R = R, R_quarter = R_quarter,
-    #              control = list(verbose = TRUE, max.time = 300))
+par_0 = c(rep(0.02, 15), rep(0.91, 11))
 
-#par_gas = result$par
-pred_gas = make_pred_gas(par_gas, X, R)
+result_sa = GenSA(lower = rep(-1, length(par_0)),
+                  upper = rep(1.9, length(par_0)),
+                  fn = error_opt_gas,
+                  X = X_gas, R = R_gas, R_quarter = R_gas_quarter,
+                  control = list(verbose = TRUE, max.time = 300))
+
+par_gas = result_sa$par
+pred_gas = make_pred_gas(par_gas, X_gas, R_gas)
+
+r_hat_gas = pred_gas$r_hat_gas
+r_hat_gas_quarter = pred_gas$r_hat_gas_quarter
+
+
 autoplot(ts.union(real_data = ts(prices$p_exp_gas[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_gas$p_hat_gas, start = c(2006, 1), freq = 12))) + ylab('p_exp_gas')
 autoplot(ts.union(real_data = ts(prices$v_exp_gas[1:end_2018], start = c(2006, 1), freq = 12),  
@@ -337,9 +343,6 @@ autoplot(ts.union(real_data = ts(prices$r_exp_gas[1:end_2018], start = c(2006, 1
 MAPE(pred_gas$v_hat_gas[1:end_2013], prices$v_exp_gas[1:end_2013])
 MAPE(pred_gas$r_hat_gas[1:end_2013], prices$r_exp_gas[1:end_2013])
 MAPE(pred_gas$p_hat_gas[1:end_2013], prices$p_exp_gas[1:end_2013])
-
-r_hat_gas = pred_gas$r_hat_gas
-r_hat_gas_quarter = pred_gas$r_hat_gas_quarter
 
 ### optimisation for export other goods model
 
@@ -373,7 +376,7 @@ make_pred_exp = function(par, X, R){
 
 
 error_opt_othg = function(par, X, R, R_quarter){
-  frcst = make_pred_exp_othg(par, X, R)
+  frcst = make_pred_exp(par, X, R)
   error_othg = pse(pred = frcst$r_hat_othg[1:end_2013], pred_quarter = frcst$r_hat_othg_quarter,
                 real = R$r_exp_othg[1:end_2013], real_quarter = R_quarter$r_exp_othg)
   error_gds  = pse(pred = frcst$r_hat_gds[1:end_2018], pred_quarter = frcst$r_hat_gds_quater,
@@ -383,10 +386,20 @@ error_opt_othg = function(par, X, R, R_quarter){
   return(error)
 }
 
+par_0 = c(rep(0.5, 4), rep(0.91, 11))
+
+result_sa_othg = GenSA(lower = rep(0, length(par_0)),
+                  upper = rep(2.5, length(par_0)),
+                  fn = error_opt_othg,
+                  X = X_othg, R = R_othg, R_quarter = R_othg_quarter,
+                  control = list(verbose = TRUE, max.time = 120))
+par_othg = result_sa_othg$par
 
 pred_exp = make_pred_exp(par_othg, X_othg, R_othg)
+
 autoplot(ts.union(real_data = ts(prices$r_exp_othg[1:end_2013], start = c(2006, 1), freq = 12),  
                   model = ts(pred_exp$r_hat_othg, start = c(2006, 1), freq = 12))) + ylab('revenue from export of other goods')
+
 autoplot(ts.union(real_data = ts(prices$r_exp_goods[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_exp$r_hat_gds, start = c(2006, 1), freq = 12))) + ylab('revenue from export of all goods')
 
@@ -414,7 +427,7 @@ R_imp_quarter = prices_quater %>%
   select(r_imp_goods, r_imp_serv, r_imp_all) %>% na.omit()
 
 
-par = c(par_imp_gds, par_imp_serv)
+#par = c(par_imp_gds, par_imp_serv)
 
 make_pred_imp = function(par, X, R){
   dummies_gds = rep(c(par[6:11], 1, par[12:16]), 13)
@@ -451,9 +464,14 @@ error_opt_imp = function(par, X, R, R_quarter){
   return(error)
 }
 
+par_0 = c(rep(0.02, 21), rep(0.91, 11))
 
-par_imp = c(par_imp_gds, par_imp_serv)
-
+result_sa_imp = GenSA(lower = rep(-1, length(par_0)),
+                       upper = rep(1.9, length(par_0)),
+                       fn = error_opt_imp,
+                       X = X_imp, R = R_imp, R_quarter = R_imp_quarter,
+                       control = list(verbose = TRUE, max.time = 300))
+par_imp = result_sa_imp$par
 pred_imp = make_pred_imp(par_imp, X_imp, R_imp)
 autoplot(ts.union(real_data = ts(prices$r_imp_goods, start = c(2006, 1), freq = 12),  
                   model = ts(pred_imp$r_hat_imp_gds, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
@@ -475,14 +493,12 @@ MAPE(r_hat_imp_all[start_2012:end_2018], prices$r_imp_all[start_2012:end_2018])
 ### Model for export of services
 
 par = par_exp_serv
+
 X_exp_serv = tibble(const = 1,
            r_hat_gds = r_hat_gds,
            r_hat_imp_serv = r_hat_imp_serv)
-
-
 R_exp_serv = prices %>% 
   select(r_exp_serv)
-
 R_exp_serv_quarter = prices_quater %>% 
   select(r_exp_serv) %>% na.omit()
 
@@ -496,7 +512,7 @@ make_pred_exp_serv = function(par, X, R){
               r_hat_exp_serv_quarter = r_hat_exp_serv_quarter))
 }
 
-error_opt_exp_serv= function(par, X, R, R_quarter){
+error_opt_exp_serv = function(par, X, R, R_quarter){
   frcst = make_pred_exp_serv(par, X, R)
   error = pse(pred = frcst$r_hat_exp_serv[start_2012:end_2018], pred_quarter = frcst$r_hat_exp_serv_quarter[2:end_2018q4],
                       real = R$r_exp_serv[start_2012:end_2018], real_quarter = R_quarter$r_exp_serv[2:end_2018q4])
@@ -504,10 +520,18 @@ error_opt_exp_serv= function(par, X, R, R_quarter){
 }
 
 
-par_exp_serv = par_exp_serv
+par_0 = c(rep(0.02, 3), rep(0.91, 11))
+
+result_sa_exp_serv = GenSA(lower = rep(-1, length(par_0)),
+                      upper = rep(1.9, length(par_0)),
+                      fn = error_opt_exp_serv,
+                      X = X_exp_serv, R = R_exp_serv, R_quarter = R_exp_serv_quarter,
+                      control = list(verbose = TRUE, max.time = 300))
+par_exp_serv = result_sa_exp_serv$par
+
 pred_exp_serv = make_pred_exp_serv(par_exp_serv, X_exp_serv, R_exp_serv)
 autoplot(ts.union(real_data = ts(prices$r_exp_serv, start = c(2006, 1), freq = 12),  
-                  model = ts(pred_exp_serv$r_hat_exp_serv, start = c(2006, 1), freq = 12))) + ylab('revenue from import of goods')
+                  model = ts(pred_exp_serv$r_hat_exp_serv, start = c(2006, 1), freq = 12))) + ylab('revenue from export of services')
 
 r_hat_exp_serv = pred_exp_serv$r_hat_exp_serv
 
@@ -518,7 +542,8 @@ MAPE(r_hat_exp_serv[start_2012:end_2018], prices$r_exp_serv[start_2012:end_2018]
 r_hat_exp_all = r_hat_exp_serv + r_hat_gds
 r_hat_exp_all_quarter = c(NA, roll_sum(r_hat_exp_all[4:end_2018], n = 3, by = 3))
 
-
+autoplot(ts.union(real_data = ts(prices$r_exp_all, start = c(2006, 1), freq = 12),  
+                  model = ts(r_hat_exp_all, start = c(2006, 1), freq = 12))) + ylab('revenue from export of goods and services')
 r_hat_bal_trade = r_hat_gds - r_hat_imp_gds
 r_hat_bal_trade_quarter = roll_sum(r_hat_bal_trade, n = 3, by = 3)
 
@@ -564,6 +589,16 @@ error_opt_balances = function(par, X, R, R_quarter){
   return(error)
 }
 
+
+par_0 = c(rep(0.02, 21), rep(0.91, 11))
+
+result_sa_rent_sinc = GenSA(lower = rep(-1, length(par_0)),
+                      upper = rep(1.9, length(par_0)),
+                      fn = error_opt_balances,
+                      X = X_rent_sinc, R = R_rent_sinc, R_quarter = R_rent_sinc_quarter,
+                      control = list(verbose = TRUE, max.time = 300))
+par_rent_sinc = result_sa_rent_sinc$par
+
 pred_rent_sinc = make_pred_balances(par_rent_sinc, X_rent_sinc, R_rent_sinc)
 
 autoplot(ts.union(real_data = ts(prices$r_bal_rent + prices$r_bal_sinc, start = c(2006, 1), freq = 12),  
@@ -588,6 +623,16 @@ R_inv = prices %>%
 R_inv_quarter = prices_quater %>% 
   select(r_bal_inv) %>%
   rename('r_real' = 'r_bal_inv')
+
+
+par_0 = c(rep(0.02, 3), rep(0.91, 11))
+
+result_sa_inv = GenSA(lower = rep(-1, length(par_0)),
+                            upper = rep(1.9, length(par_0)),
+                            fn = error_opt_balances,
+                            X = X_inv, R = R_inv, R_quarter = R_inv_quarter,
+                            control = list(verbose = TRUE, max.time = 300))
+par_inv = result_sa_inv$par
 
 
 pred_inv = make_pred_balances(par_inv, X_inv, R_inv)
@@ -616,6 +661,17 @@ R_wage_quarter = prices_quater %>%
   rename('r_real' = 'r_bal_wage') %>%
   na.omit()
 
+length(par_bal_wage)
+par_0 = c(rep(0.02, 5), rep(0.91, 11))
+
+result_sa_wage = GenSA(lower = rep(-1, length(par_0)),
+                            upper = rep(1.9, length(par_0)),
+                            fn = error_opt_balances,
+                            X = X_wage, R = R_wage, R_quarter = R_wage_quarter,
+                            control = list(verbose = TRUE, max.time = 300))
+par_bal_wage = result_sa_wage$par
+
+
 pred_wage = make_pred_balances(par_bal_wage, X_wage, R_wage)
 autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 12),  
                   model = ts(pred_wage$r_hat, start = c(2006, 1), freq = 12))) + ylab('balance of rent and sinc')
@@ -643,6 +699,7 @@ R_errors_quarter = prices_quater %>%
 
 par = par_errors
 
+
 make_pred_errors = function(par, X){
   r_hat_errors = as.matrix(X) %*% c(par[1:8], 1, par[9:13])
   r_hat_errors_quarter = roll_sum(r_hat_errors, n = 3, by = 3) 
@@ -656,6 +713,17 @@ error_opt_errors = function(par, X, R, R_quarter){
                   real = R$r_real[start_2012:end_2018], real_quarter = R_quarter$r_real[2:end_2018q4])
   return(error)
 }
+
+
+par_0 = c(rep(0.02, 2), rep(0.91, 11))
+
+result_sa_errors = GenSA(lower = rep(-1, length(par_0)),
+                         upper = rep(1.9, length(par_0)),
+                         fn = error_opt_errors,
+                         X = X_errors, R = R_errors, R_quarter = R_errors_quarter,
+                         control = list(verbose = TRUE, max.time = 300))
+
+par_errors = result_sa_errors$par
 
 pred_erros = make_pred_errors(par_errors, X_errors)
 
@@ -678,7 +746,7 @@ r_hat_cur_acc = r_hat_cap_acc[1:end_2018] + r_hat_inv + r_hat_rent_sinc + r_hat_
 
 r_hat_cur_acc = c(r_hat_cur_acc,rep(NaN, 12))
 
-X_difr = tibble(const=1,
+X_difr = tibble(const = 1,
                 ###r_hat_difr = 1,
                 dif_brent = prices$dif_brent, 
                 dif_brent_cor = (prices$dif_brent * prices$vcor)/(prices$rub_usd_1),
@@ -719,12 +787,9 @@ fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1,
 }
 
 
-par_dif_res = par_model$par_dif_res_long
+
 par_dr = c(par_model$par_dif_res_long, par_model$par_dif_res_short)
 par = c(par_model$par_dif_res_long, par_model$par_dif_res_short)
-X = X_difr_dummy
-R = R_dif_reserves
-R_quarter = R_dif_reserves_quarter
 
 make_pred_dif_res = function(par, X){
   r_hat_dif_res = rep(NaN, end_2018)
@@ -763,7 +828,18 @@ error_opt_dif_res = function(par, X, R, R_quarter){
   return(error)
 }
 
-pred_res = make_pred_dif_res(par_dr, X_difr_dummy)
+length(par_dr)
+par_0 = c(rep(0.8, 34))
+
+result_sa_dif_reserves = GenSA(lower = rep(-1, length(par_0)),
+                         upper = rep(1.9, length(par_0)),
+                         fn = error_opt_dif_res,
+                         X = X_difr_dummy, R = R_dif_reserves, R_quarter = R_dif_reserves_quarter,
+                         control = list(verbose = TRUE, max.time = 600))
+
+par_difr_res = result_sa_dif_reserves$par
+
+pred_res = make_pred_dif_res(par_difr_res, X_difr_dummy)
 
 r_hat_dif_res = pred_res$r_hat_dif_res 
 r_hat_dif_res_quarter = pred_res$r_hat_dif_res_quarter
@@ -822,7 +898,20 @@ error_opt_cur_purch = function(par, X, R, R_quarter){
   return(error)
 }
 
-head(prices$r_cur_purch)
+
+
+length(par_cur_purch)
+par_0 = c(rep(0.8, 5))
+
+result_sa_cur_purch = GenSA(lower = rep(-1, length(par_0)),
+                               upper = rep(1.9, length(par_0)),
+                               fn = error_opt_cur_purch,
+                               X = X_cur, R = R_cur, R_quarter = R_cur_quarter,
+                               control = list(verbose = TRUE, max.time = 300))
+
+par_cur_purch = result_sa_cur_purch$par
+
+
 pred_cur_purch = make_pred_cur_purch(par_cur_purch, X_cur)
 r_hat_cur_purch = pred_cur_purch$r_hat_cur_purch 
 r_hat_cur_purch_quarter = pred_cur_purch$r_hat_cur_purch_quarter
@@ -833,7 +922,6 @@ autoplot(ts.union(real_data = ts(prices$r_cur_purch, start = c(2006, 1), freq = 
 
 
 ### model for exchange rate
-
 X_rub_usd = tibble(const = 1, 
                    dif_brent_ratio = prices$dif_brent_ratio,
                    dif_brent_ratio_1114 = prices$dum_1114 * dif_brent_ratio,
@@ -851,10 +939,8 @@ R_rub_usd = prices %>%
   select(rub_usd) %>%
   rename('r_real' = 'rub_usd')
 
-R_rub_usd_quarter = roll_mean(R_rub_usd$r_real, n = 3, by = 3)
 
-X = X_rub_usd
-par = par_rub_usd
+R_rub_usd_quarter = roll_mean(R_rub_usd$r_real, n = 3, by = 3)
 
 
 mask = matrix(0, 8, end_2018)
@@ -899,10 +985,7 @@ make_pred_rub_usd = function(par, X, R, mask){
                     hat_rub_usd_quarter = hat_rub_usd_quarter,
                     hat_rub_usd = hat_rub_usd))
 }
-X = X_rub_usd
-R = R_rub_usd
-R_quarter = R_rub_usd_quarter
-par = par_rub_usd
+
 error_opt_rub_usd = function(par, X, R, R_quarter){
   frcst = make_pred_rub_usd(par, X, R, mask)
   hat_rub_usd_final = frcst$hat_rub_usd_final
@@ -917,8 +1000,21 @@ error_opt_rub_usd = function(par, X, R, R_quarter){
   error = error_month_mean + error_quarter
   return(error)
 }
+
+
+par_0 = c(rep(0.8, 11))
+
+result_sa_rub_usd = GenSA(lower = rep(-1, length(par_0)),
+                            upper = rep(1.9, length(par_0)),
+                            fn = error_opt_rub_usd,
+                            X = X_rub_usd, R = R_rub_usd, R_quarter = R_rub_usd_quarter,
+                            control = list(verbose = TRUE, max.time = 300))
+
+par_cur_purch = result_sa_cur_purch$par
+
 pred_rub_usd = make_pred_rub_usd(par_rub_usd, X_rub_usd,R_rub_usd,mask=mask)
 hat_rub_usd_final = pred_rub_usd$hat_rub_usd_final
 
 autoplot(ts.union(real_data = ts(prices$rub_usd, start = c(2006, 1), freq = 12),  
                   model = ts(hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('currency purchase')
+
