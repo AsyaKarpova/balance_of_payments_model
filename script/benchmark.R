@@ -61,13 +61,13 @@ mape = series_models %>%
   arrange(MAPE)
 
 
-snaive_fit = series_models %>% filter(.model=='snaive')
-arima_fit = series_models %>% filter(.model=='arima')
-ets_fit = series_models %>% filter(.model=='ets')
+snaive_fit = series_models %>% filter(.model == 'snaive')
+arima_fit = series_models %>% filter(.model == 'arima')
+ets_fit = series_models %>% filter(.model == 'ets')
 
-snaive = series_forecasts %>% filter(.model=='snaive')
-arima = series_forecasts %>% filter(.model=='arima')
-ets = series_forecasts %>% filter(.model=='ets')
+snaive = series_forecasts %>% filter(.model == 'snaive')
+arima = series_forecasts %>% filter(.model == 'arima')
+ets = series_forecasts %>% filter(.model == 'ets')
 
 
 export(mape, 'mape.csv')
