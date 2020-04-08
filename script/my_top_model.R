@@ -183,9 +183,9 @@ ggsave('oil_v.png')
 autoplot(ts.union(real_data = ts(prices$r_exp_oil[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_oil$r_hat_oil, start = c(2006, 1), freq = 12)), size= 0.7) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
 ggsave('oil_r.png')     
-MAPE(pred_oil$v_hat_oil[1:end_2013], prices$v_exp_oil[1:end_2013])
-MAPE(pred_oil$r_hat_oil[1:end_2013], prices$r_exp_oil[1:end_2013])
-MAPE(pred_oil$p_hat_oil[1:end_2013], prices$p_exp_oil[1:end_2013])
+mape(pred_oil$v_hat_oil[1:end_2013], prices$v_exp_oil[1:end_2013])
+mape(pred_oil$r_hat_oil[1:end_2013], prices$r_exp_oil[1:end_2013])
+mape(pred_oil$p_hat_oil[1:end_2013], prices$p_exp_oil[1:end_2013])
 
 
 r_hat_oil = pred_oil$r_hat_oil
@@ -267,9 +267,9 @@ autoplot(ts.union(real_data = ts(prices$r_exp_op[1:end_2018], start = c(2006, 1)
 
 ggsave('op_r.png')
 
-MAPE(pred_op$v_hat_op[1:end_2013], prices$v_exp_op[1:end_2013])
-MAPE(pred_op$r_hat_op[1:end_2013], prices$r_exp_op[1:end_2013])
-MAPE(pred_op$p_hat_op[1:end_2013], prices$p_exp_op[1:end_2013])
+mape(pred_op$v_hat_op[1:end_2013], prices$v_exp_op[1:end_2013])
+mape(pred_op$r_hat_op[1:end_2013], prices$r_exp_op[1:end_2013])
+mape(pred_op$p_hat_op[1:end_2013], prices$p_exp_op[1:end_2013])
 
 r_hat_op = pred_op$r_hat_op
 r_hat_op_quarter = pred_op$r_hat_op_quarter
@@ -355,9 +355,9 @@ autoplot(ts.union(real_data = ts(prices$r_exp_gas[1:end_2018], start = c(2006, 1
                   model = ts(pred_gas$r_hat_gas, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('r_exp_gas')  + xlab('') + ggtitle('Average revenue from export of gas')
 ggsave('gas_r.png')
 
-MAPE(pred_gas$v_hat_gas[1:end_2013], prices$v_exp_gas[1:end_2013])
-MAPE(pred_gas$r_hat_gas[1:end_2013], prices$r_exp_gas[1:end_2013])
-MAPE(pred_gas$p_hat_gas[1:end_2013], prices$p_exp_gas[1:end_2013])
+mape(pred_gas$v_hat_gas[1:end_2013], prices$v_exp_gas[1:end_2013])
+mape(pred_gas$r_hat_gas[1:end_2013], prices$r_exp_gas[1:end_2013])
+mape(pred_gas$p_hat_gas[1:end_2013], prices$p_exp_gas[1:end_2013])
 
 ### optimisation for export other goods model
 
@@ -423,8 +423,8 @@ r_hat_othg = pred_exp$r_hat_othg
 r_hat_gds = pred_exp$r_hat_gds
 
 
-MAPE(r_hat_othg[1:end_2013], prices$r_exp_othg[1:end_2013])
-MAPE(r_hat_gds[1:end_2018], prices$r_exp_goods[1:end_2018])
+mape(r_hat_othg[1:end_2013], prices$r_exp_othg[1:end_2013])
+mape(r_hat_gds[1:end_2018], prices$r_exp_goods[1:end_2018])
 
 
 # Model for goods import (restore monthly data!!!!) (r_imp_goods^ + r_imp_serv^ + r_imp_all^)
@@ -501,9 +501,9 @@ r_hat_imp_serv = pred_imp$r_hat_imp_serv[1:end_2018]
 r_hat_imp_all = pred_imp$r_imp_all[1:end_2018]
 
 
-MAPE(r_hat_imp_gds, prices$r_imp_goods[1:end_2018])
-MAPE(r_hat_imp_serv[start_2012:end_2018], prices$r_imp_serv[start_2012:end_2018])
-MAPE(r_hat_imp_all[start_2012:end_2018], prices$r_imp_all[start_2012:end_2018])
+mape(r_hat_imp_gds, prices$r_imp_goods[1:end_2018])
+mape(r_hat_imp_serv[start_2012:end_2018], prices$r_imp_serv[start_2012:end_2018])
+mape(r_hat_imp_all[start_2012:end_2018], prices$r_imp_all[start_2012:end_2018])
 
 
 ### Model for export of services
@@ -551,7 +551,7 @@ autoplot(ts.union(real_data = ts(prices$r_exp_serv, start = c(2006, 1), freq = 1
 
 r_hat_exp_serv = pred_exp_serv$r_hat_exp_serv
 
-MAPE(r_hat_exp_serv[start_2012:end_2018], prices$r_exp_serv[start_2012:end_2018])
+mape(r_hat_exp_serv[start_2012:end_2018], prices$r_exp_serv[start_2012:end_2018])
 
 
 
@@ -622,7 +622,7 @@ autoplot(ts.union(real_data = ts(prices$r_bal_rent + prices$r_bal_sinc, start = 
 
 r_hat_rent_sinc = pred_rent_sinc$r_hat
 
-MAPE(r_hat_rent_sinc[start_2012:end_2018], (prices$r_bal_rent + prices$r_bal_sinc)[start_2012:end_2018])
+mape(r_hat_rent_sinc[start_2012:end_2018], (prices$r_bal_rent + prices$r_bal_sinc)[start_2012:end_2018])
 mase(r_hat_rent_sinc[start_2012:end_2018], (prices$r_bal_rent + prices$r_bal_sinc)[start_2012:end_2018])
 smape(r_hat_rent_sinc[start_2012:end_2018], (prices$r_bal_rent + prices$r_bal_sinc)[start_2012:end_2018])
 
@@ -657,7 +657,7 @@ autoplot(ts.union(real_data = ts(prices$r_bal_inv, start = c(2006, 1), freq = 12
 
 r_hat_inv = pred_inv$r_hat
 
-MAPE(r_hat_inv[start_2012:end_2018], prices$r_bal_inv[start_2012:end_2018])
+mape(r_hat_inv[start_2012:end_2018], prices$r_bal_inv[start_2012:end_2018])
 
 
 # (3) balance of wages
@@ -694,7 +694,7 @@ autoplot(ts.union(real_data = ts(prices$r_bal_wage, start = c(2006, 1), freq = 1
 
 r_hat_wage = pred_wage$r_hat
 
-MAPE(r_hat_wage[start_2012:end_2018], prices$r_bal_wage[start_2012:end_2018])
+mape(r_hat_wage[start_2012:end_2018], prices$r_bal_wage[start_2012:end_2018])
 mase(r_hat_wage[start_2012:end_2018], prices$r_bal_wage[start_2012:end_2018])
 smape(r_hat_wage[start_2012:end_2018], prices$r_bal_wage[start_2012:end_2018])
 
@@ -748,7 +748,7 @@ r_hat_errors = pred_erros$r_hat_errors
 autoplot(ts.union(real_data = ts(prices$r_errors, start = c(2006, 1), freq = 12),  
                   model = ts(r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('net errors and omissions')
 
-MAPE(r_hat_errors[start_2012:end_2018], prices$r_errors[start_2012:end_2018])
+mape(r_hat_errors[start_2012:end_2018], prices$r_errors[start_2012:end_2018])
 mase(r_hat_errors[start_2012:end_2018], prices$r_errors[start_2012:end_2018])
 smape(r_hat_errors[start_2012:end_2018], prices$r_errors[start_2012:end_2018])
 
@@ -865,7 +865,7 @@ r_hat_dif_res_short_quarter = pred_res$r_hat_dif_res_short_quarter
 autoplot(ts.union(real_data = ts(prices$r_dif_reserves, start = c(2006, 1), freq = 12),  
                   model = ts(r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('difference in reserves')
 
-MAPE(r_hat_dif_res_short[start_2012:(end_2018)], prices$r_dif_reserves[start_2012:(end_2018)])
+mape(r_hat_dif_res_short[start_2012:(end_2018)], prices$r_dif_reserves[start_2012:(end_2018)])
 
 
 r_hat_bal_fin = r_hat_errors[1:end_2018] - r_hat_dif_res[1:end_2018] + r_hat_cur_acc[1:end_2018]
