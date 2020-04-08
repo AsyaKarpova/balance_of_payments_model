@@ -6,11 +6,16 @@ library(GenSA)
 library(stats)
 library(Metrics)
 library(tidyverse)
+library(tsibble)
+library(zoo)
+library(fable)
+library(lubridate)
 
 
 prices = import('data/data_month.xlsx')
 prices_quater = import('data/data_quarter.xlsx')
-par_model = import('par_model.Rds')
+
+par_model = import('script/gensa_par.Rds')
 
 # gas, op, oil monthly data until 2013Q12 (end_2013 obs.)
 # export, import, n_' until 2018Q12 (end_2018 obs.)
@@ -29,17 +34,19 @@ par_rent_sinc = par_model$par_rent_sinc
 par_inv = par_model$par_inv
 par_errors = par_model$par_errors
 par_dif_res = par_model$par_dif_res_long
-par_dif_res_short = par_model$par_dif_res_short
+#par_dif_res_short = par_model$par_dif_res_short
 par_cur_purch = par_model$par_cur_purch
 par_rub_usd = par_model$par_rub_usd
 
 lag = function(ts, n){
   return(dplyr::lag(ts, n = n))
 }
+vars = prices %>% select(-'dum01':-'dum12', -'dum_2012', -'dum_1114', -'n_j':-'n_ds', -'n_y',-'n_c', -'n_g', -'vcor')
 
 # create dataframe 
 prices = mutate(prices, 
                 const = 1,
+                date = yearmonth(date),
                 brent_1 = lag(prices$brent, n = 1),
                 brent_2 = lag(prices$brent, n = 2),
                 brent_3 = lag(prices$brent, n = 3),
@@ -79,16 +86,13 @@ prices = mutate(prices,
                 dif_usd_eur_ratio = dif_usd_eur/usd_eur_1,
                 dif_r = rate_repo - rate_10tr,
                 dif_r_1 = lag(dif_r, 1))
-               
 
 # dates
-
 end_2018 = 156 
 end_2013 = 96
 end_2018q4 = 52
 start_2012 = 73
-
-
+library(zoo)
 ### loss functions (two types)
 
 pse0 = function(y, yhat) {
@@ -170,13 +174,15 @@ par_oil = result_sa$par
 pred_oil = make_pred_oil(par_oil, X_oil, R_oil)
 
 autoplot(ts.union(real_data = ts(prices$p_exp_oil[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_oil$p_hat_oil, start = c(2006, 1), freq = 12))) + ylab('p_exp_oil')
+                  model = ts(pred_oil$p_hat_oil, start = c(2006, 1), freq = 12)), size = 0.8) + ylab('p_exp_oil') + xlab('') +  ggtitle('Average price of oil exported')
+ggsave('oil_p.png')
 
 autoplot(ts.union(real_data = ts(prices$v_exp_oil[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_oil$v_hat_oil, start = c(2006, 1), freq = 12))) + ylab('v_exp_oil') + ggtitle('Average volume of oil exported')
+                  model = ts(pred_oil$v_hat_oil, start = c(2006, 1), freq = 12)), size =0.7) + ylab('v_exp_oil') + xlab('') + ggtitle('Average volume of oil exported')
+ggsave('oil_v.png')
 autoplot(ts.union(real_data = ts(prices$r_exp_oil[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_oil$r_hat_oil, start = c(2006, 1), freq = 12)),size=1) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
-      
+                  model = ts(pred_oil$r_hat_oil, start = c(2006, 1), freq = 12)), size= 0.7) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
+ggsave('oil_r.png')     
 MAPE(pred_oil$v_hat_oil[1:end_2013], prices$v_exp_oil[1:end_2013])
 MAPE(pred_oil$r_hat_oil[1:end_2013], prices$r_exp_oil[1:end_2013])
 MAPE(pred_oil$p_hat_oil[1:end_2013], prices$p_exp_oil[1:end_2013])
@@ -184,6 +190,13 @@ MAPE(pred_oil$p_hat_oil[1:end_2013], prices$p_exp_oil[1:end_2013])
 r_hat_oil = pred_oil$r_hat_oil
 r_hat_oil_quarter = pred_oil$r_hat_oil_quarter
 
+
+r_exp_oil = ts(prices$p_exp_oil[1:96], start=c(2006,1), frequency = 12)
+fit_roil = auto.arima(r_exp_oil)
+autoplot(forecast(fit, h=3))
+autoplot(forecast(fit, h=6))
+autoplot(forecast(fit, h=9))
+autoplot(forecast(fit, h=12))
 
 
 # MY OPTIMIZATION for oil product model
@@ -249,11 +262,16 @@ par_op = result_sa$par
 
 pred_op = make_pred_op(par_op, X_op, R_op)
 autoplot(ts.union(real_data = ts(prices$p_exp_op[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_op$p_hat_op, start = c(2006, 1), freq = 12))) + ylab('p_exp_op')
+                  model = ts(pred_op$p_hat_op, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('p_exp_op')  + xlab('') + ggtitle('Average price of oil products exported')
+ggsave('op_p.png')
+
 autoplot(ts.union(real_data = ts(prices$v_exp_op[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_op$v_hat_op, start = c(2006, 1), freq = 12))) + ylab('v_exp_op')
+                  model = ts(pred_op$v_hat_op, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('v_exp_op') + xlab('') + ggtitle('Average volume of oil products exported')
+ggsave('op_v.png')
 autoplot(ts.union(real_data = ts(prices$r_exp_op[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_op$r_hat_op, start = c(2006, 1), freq = 12))) + ylab('r_exp_op')
+                  model = ts(pred_op$r_hat_op, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('r_exp_op') + xlab('') + ggtitle('Average revenue from export of oil products')
+
+ggsave('op_r.png')
 
 MAPE(pred_op$v_hat_op[1:end_2013], prices$v_exp_op[1:end_2013])
 MAPE(pred_op$r_hat_op[1:end_2013], prices$r_exp_op[1:end_2013])
@@ -334,11 +352,14 @@ r_hat_gas_quarter = pred_gas$r_hat_gas_quarter
 
 
 autoplot(ts.union(real_data = ts(prices$p_exp_gas[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_gas$p_hat_gas, start = c(2006, 1), freq = 12))) + ylab('p_exp_gas')
+                  model = ts(pred_gas$p_hat_gas, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('p_exp_gas') + xlab('') + ggtitle('Average price of gas exported')
+ggsave('gas_p.png')
 autoplot(ts.union(real_data = ts(prices$v_exp_gas[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_gas$v_hat_gas, start = c(2006, 1), freq = 12))) + ylab('v_exp_gas')
+                  model = ts(pred_gas$v_hat_gas, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('v_exp_gas') + xlab('') + ggtitle('Average volume of gas exported')
+ggsave('gas_v.png')
 autoplot(ts.union(real_data = ts(prices$r_exp_gas[1:end_2018], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_gas$r_hat_gas, start = c(2006, 1), freq = 12))) + ylab('r_exp_gas')
+                  model = ts(pred_gas$r_hat_gas, start = c(2006, 1), freq = 12)), size = 0.7) + ylab('r_exp_gas')  + xlab('') + ggtitle('Average revenue from export of gas')
+ggsave('gas_r.png')
 
 MAPE(pred_gas$v_hat_gas[1:end_2013], prices$v_exp_gas[1:end_2013])
 MAPE(pred_gas$r_hat_gas[1:end_2013], prices$r_exp_gas[1:end_2013])
@@ -347,7 +368,7 @@ MAPE(pred_gas$p_hat_gas[1:end_2013], prices$p_exp_gas[1:end_2013])
 ### optimisation for export other goods model
 
 par = par_othg
-
+par
 X_othg = tibble(const = 1, 
            r_hat_oog = r_hat_gas + r_hat_oil + r_hat_op, 
            r_hat_oog_dum = r_hat_oog * prices$dum_1114[1:end_2018],
@@ -357,7 +378,6 @@ R_othg = prices %>% select(r_exp_othg, r_exp_goods)
 
 R_othg_quarter = prices_quater %>% 
   select(r_exp_othg, r_exp_goods) %>% na.omit()
-
 
 
 make_pred_exp = function(par, X, R){
@@ -374,13 +394,13 @@ make_pred_exp = function(par, X, R){
               r_hat_gds_quater = r_hat_gds_quarter))
 }
 
-
+R_quarter = R_othg_quarter
 error_opt_othg = function(par, X, R, R_quarter){
   frcst = make_pred_exp(par, X, R)
   error_othg = pse(pred = frcst$r_hat_othg[1:end_2013], pred_quarter = frcst$r_hat_othg_quarter,
                 real = R$r_exp_othg[1:end_2013], real_quarter = R_quarter$r_exp_othg)
   error_gds  = pse(pred = frcst$r_hat_gds[1:end_2018], pred_quarter = frcst$r_hat_gds_quater,
-                    real = R$r_exp_gds[1:end_2018], real_quarter = R_quarter$r_exp_gds)
+                    real = R$r_exp_goods[1:end_2018], real_quarter = R_quarter$r_exp_goods)
   error = error_gds + error_othg
 
   return(error)
@@ -394,11 +414,11 @@ result_sa_othg = GenSA(lower = rep(0, length(par_0)),
                   X = X_othg, R = R_othg, R_quarter = R_othg_quarter,
                   control = list(verbose = TRUE, max.time = 120))
 par_othg = result_sa_othg$par
-
+par_othg
 pred_exp = make_pred_exp(par_othg, X_othg, R_othg)
 
 autoplot(ts.union(real_data = ts(prices$r_exp_othg[1:end_2013], start = c(2006, 1), freq = 12),  
-                  model = ts(pred_exp$r_hat_othg, start = c(2006, 1), freq = 12))) + ylab('revenue from export of other goods')
+                  model = ts(pred_exp$r_hat_othg, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of other goods')
 
 autoplot(ts.union(real_data = ts(prices$r_exp_goods[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_exp$r_hat_gds, start = c(2006, 1), freq = 12))) + ylab('revenue from export of all goods')
@@ -789,7 +809,7 @@ fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1,
 
 
 par_dr = c(par_model$par_dif_res_long, par_model$par_dif_res_short)
-par = c(par_model$par_dif_res_long, par_model$par_dif_res_short)
+
 
 make_pred_dif_res = function(par, X){
   r_hat_dif_res = rep(NaN, end_2018)
@@ -1018,3 +1038,19 @@ hat_rub_usd_final = pred_rub_usd$hat_rub_usd_final
 autoplot(ts.union(real_data = ts(prices$rub_usd, start = c(2006, 1), freq = 12),  
                   model = ts(hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('currency purchase')
 
+
+#gensa_par_is = import('script/gensa_par.Rds')
+#gensa_par_is$par_othg = par_othg
+#gensa_par = list(par_bal_wage = par_bal_wage, 
+ #                par_cur_purch = par_cur_purch, par_dif_res = par_dif_res,
+  #               par_errors = par_errors, par_exp_serv = par_exp_serv, 
+   #              par_gas = par_gas, par_oil=par_oil, par_op = par_op,par_imp = par_imp, 
+    #             par_imp_gds = par_imp_gds, par_imp_serv = par_imp_serv, par_inv = par_inv,
+     #            par_rub_usd= par_rub_usd, par_rent_sinc = par_rent_sinc, par_othg = par_otgh)
+export(gensa_par_is, 'gensa_par.Rds')
+par_dif_res
+
+
+plots.dir.path = list.files(tempdir(), pattern="rs-graphics", full.names = TRUE); 
+plots.png.paths = list.files(plots.dir.path, pattern=".png", full.names = TRUE)
+file.copy(from = plots.png.paths, to="D:/Users/DNS/balance_of_payments_model/plot")
