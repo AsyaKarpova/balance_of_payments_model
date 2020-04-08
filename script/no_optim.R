@@ -42,50 +42,6 @@ lag = function(ts, n){
 }
 vars = prices %>% select(-'dum01':-'dum12', -'dum_2012', -'dum_1114', -'n_j':-'n_ds', -'n_y',-'n_c', -'n_g', -'vcor')
 
-# create dataframe 
-prices = mutate(prices, 
-                const = 1,
-                date = yearmonth(date),
-                brent_1 = lag(prices$brent, n = 1),
-                brent_2 = lag(prices$brent, n = 2),
-                brent_3 = lag(prices$brent, n = 3),
-                brent_4 = lag(prices$brent, n = 4),
-                brent_5 = lag(prices$brent, n = 5),
-                brent_6 = lag(prices$brent, n = 6),
-                gas_europe_1 = lag(prices$gas_europe, n = 1), 
-                gas_europe_2 = lag(prices$gas_europe, n = 2), 
-                gas_europe_3 = lag(prices$gas_europe, n = 3), 
-                gas_lng_1 = lag(prices$gas_lng, n = 1), 
-                gas_lng_2 = lag(prices$gas_lng, n = 2), 
-                gas_lng_3 = lag(prices$gas_lng, n = 3), 
-                gas_lng_4 = lag(prices$gas_lng, n = 4),
-                gas_lng_5 = lag(prices$gas_lng, n = 5), 
-                rub_usd_1 = lag(prices$rub_usd, 1),
-                rub_usd_2 = lag(prices$rub_usd, 2), 
-                usd_eur_1 = lag(prices$usd_eur, 1),
-                v_prod_op_1 = lag(prices$v_prod_op, 1), 
-                gdp_1 = lag(prices$n_y, 1), 
-                vnok_1 = lag(prices$n_j, 1), 
-                n_ds_1 = lag(prices$n_ds, 1),
-                n_c_1 = lag(prices$n_c, 1),
-                n_j_1 = lag(prices$n_j, 1), # n_j — ВНОК
-                n_ds = lag(prices$n_ds, 1),
-                v_exp_oil_1 = lag(prices$v_exp_oil, 1), 
-                p_exp_oil_3 = lag(prices$p_exp_oil, 3),
-                rub_usd_eur_1 = rub_usd_1 * usd_eur_1,
-                r_rent_sinc = r_bal_rent + r_bal_sinc,
-                dif_usd_rub_ratio = (rub_usd - rub_usd_1)/rub_usd_1,
-                dif_usd_rub_ratio_1 = (rub_usd_1 - rub_usd_2)/rub_usd_2,
-                dif_brent = brent - brent_1,
-                dif_usd_rub = rub_usd - rub_usd_1,
-                dif_usd_eur = usd_eur - usd_eur_1, 
-                dif_em_index = em_index - lag(em_index, 1),
-                dif_em_index_ratio = dif_em_index/lag(em_index, 1),
-                dif_brent_ratio = dif_brent/brent_1,
-                dif_usd_eur_ratio = dif_usd_eur/usd_eur_1,
-                dif_r = rate_repo - rate_10tr,
-                dif_r_1 = lag(dif_r, 1))
-
 # dates
 end_2018 = 156 
 end_2013 = 96
