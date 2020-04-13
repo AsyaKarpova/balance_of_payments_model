@@ -16,6 +16,7 @@ all_vars_quater = import('data/data_quarter.xlsx')
 par_model = import('script/gensa_par.Rds')
 
 source('script/functions.R')
+
 # gas, op, oil monthly data until 2013Q12 (end_2013 obs.)
 # export, import, n_' until 2018Q12 (end_2018 obs.)
 # r_exp_serv, r_exp_all,r_imp_goods,r_imp_serv,r_imp_all and some r_bal_' from 2012Q1 (start from start_2012 index)
@@ -388,7 +389,7 @@ pred_erros = make_pred_errors(par_errors, X_errors)
 r_hat_errors = pred_erros$r_hat_errors
 
 autoplot(ts.union(real_data = ts(all_vars$r_errors, start = c(2006, 1), freq = 12),  
-                  model = ts(r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('net errors and omissions')
+                  model = ts(r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('Net errors and omissions')
 #ggsave('errors.png')
 
 mape_r_hat_errors = mape(r_hat_errors[(end_2018-12):end_2018], all_vars$r_errors[(end_2018-12):end_2018])
@@ -401,7 +402,9 @@ smape(r_hat_errors[(end_2018-12):end_2018], all_vars$r_errors[(end_2018-12):end_
 r_hat_cap_acc = c(unlist(import('data/r_hat_cap_account.csv')[1,]))
 
 # until 2018Q12
-r_hat_cur_acc = r_hat_cap_acc[1:end_2018] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
+#r_hat_cur_acc = r_hat_cap_acc[1:end_2018] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
+
+r_hat_cur_acc = r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
 
 r_hat_cur_acc = c(r_hat_cur_acc,rep(NaN, 12))
 

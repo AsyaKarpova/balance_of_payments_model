@@ -105,7 +105,7 @@ make_pred_oil = function(par, X, R, end = nrow(X)){
   X_v = tibble(const2 = 1, rub_usd_1 = X$rub_usd_1, 
                p_hat_oil_3 = lag(p_hat_oil, 3))
   X_v_by_par = as.matrix(X_v) %*% par[4:6]
-  dummies = rep(c(par[8:13], 1, par[14:18]), 13)
+  dummies = rep(c(par[8:13], 1, par[14:18]), nrow(X)/12)
   v_hat_oil = rep(NA, end)
   v_hat_oil[1:4] = R$v_exp_oil[1:4]
   for (i in 5:nrow(X)) {
@@ -163,7 +163,7 @@ make_pred_gas = function(par, X, R, end = nrow(X)){
                usd_eur = X$usd_eur, 
                dif_usd_rub_ratio_1 = X$dif_usd_rub_ratio_1)
   X_v_by_par = as.matrix(X_v) %*% par[10:15]
-  dummies = rep(c(par[16:21], 1, par[22:26]), 13)
+  dummies = rep(c(par[16:21], 1, par[22:26]), nrow(X)/12)
   v_hat_gas = rep(NA, end)
   v_hat_gas[1:end] = X_v_by_par * dummies
   v_hat_gas[1:8] = R$v_exp_gas[1:8]
@@ -181,7 +181,7 @@ make_pred_gas = function(par, X, R, end = nrow(X)){
 
 make_pred_exp = function(par, X, R, end = nrow(X)){
   X = X[1:end,]
-  dummies = rep(c(par[5:10], 1, par[11:15]), 13)
+  dummies = rep(c(par[5:10], 1, par[11:15]), nrow(X)/12)
   r_hat_othg = rep(NA, end)
   r_hat_othg = (as.matrix(X) %*% par[1:4]) * dummies
   r_hat_othg[1] = R$r_exp_othg[1]
@@ -199,14 +199,14 @@ make_pred_exp = function(par, X, R, end = nrow(X)){
 make_pred_imp = function(par, X, R, end = nrow(X)){
   
   X = X[1:end, ]
-  dummies_gds = rep(c(par[6:11], 1, par[12:16]), 13)
+  dummies_gds = rep(c(par[6:11], 1, par[12:16]), nrow(X)/12)
   r_hat_imp_gds = (as.matrix(X) %*% par[2:5]) * dummies_gds + par[1]
   r_hat_imp_gds[1] = R$r_imp_goods[1]
   
   r_hat_imp_gds_quarter = roll_sum(r_hat_imp_gds, n = 3, by = 3)
   
   X_serv = select(X, -r_hat_gds) %>% mutate(r_hat_imp_gds = r_hat_imp_gds)
-  dummies_serv = rep(c(par[22:27], 1, par[28:32]), 13)
+  dummies_serv = rep(c(par[22:27], 1, par[28:32]), nrow(X)/12)
   r_hat_imp_serv = (as.matrix(X_serv) %*% par[18:21]) * dummies_serv + par[17]
   r_hat_imp_serv_quarter = c(NA, roll_sum(r_hat_imp_serv[4:length(r_hat_imp_serv)], n = 3, by = 3))
   r_imp_all = r_hat_imp_gds + r_hat_imp_serv
@@ -220,7 +220,7 @@ make_pred_imp = function(par, X, R, end = nrow(X)){
 }
 
 make_pred_exp_serv = function(par, X, R, end = nrow(X)){
-  dummies = rep(c(par[4:9], 1, par[10:14]), 13)
+  dummies = rep(c(par[4:9], 1, par[10:14]), nrow(X)/12)
   r_hat_exp_serv = (as.matrix(X) %*% par[1:3]) * dummies
   r_hat_exp_serv_quarter = roll_sum(r_hat_exp_serv, n = 3, by = 3) # рассчет квартальной выручки
   return(list(r_hat_exp_serv = r_hat_exp_serv, 
@@ -230,7 +230,7 @@ make_pred_exp_serv = function(par, X, R, end = nrow(X)){
 make_pred_balances = function(par, X, R, end = nrow(X)){
   X = X[1:end, ]
   n_pred = ncol(X)
-  dummies = rep(c(par[(n_pred + 1):(n_pred + 6)], 1, par[(n_pred + 7):(n_pred + 11)]), 13)
+  dummies = rep(c(par[(n_pred + 1):(n_pred + 6)], 1, par[(n_pred + 7):(n_pred + 11)]), nrow(X)/12)
   r_hat = (as.matrix(X) %*% par[1:n_pred]) * dummies
   r_hat_quarter = roll_sum(r_hat, n = 3, by = 3) 
   return(list(r_hat = r_hat, 
@@ -238,25 +238,26 @@ make_pred_balances = function(par, X, R, end = nrow(X)){
 }
 
 make_pred_errors = function(par, X, end = nrow(X)){
-  r_hat_errors = as.matrix(X) %*% c(par[1:8], 1, par[9:13])
+  r_hat_errors = X %>% as_tibble() %>% select(-date)%>%
+    as.matrix() %*% c(par[1:8], 1, par[9:13])
   r_hat_errors_quarter = roll_sum(r_hat_errors, n = 3, by = 3) 
   return(list(r_hat_errors = r_hat_errors, 
               r_hat_errors_quarter = r_hat_errors_quarter))
 }
 
-make_pred_dif_res = function(par, X){
-  r_hat_dif_res = rep(NaN, end_2018)
-  X_long = as.matrix(select(X, - r_cur_purch, -r_cur_purch_1))
+make_pred_dif_res = function(par, X, end = nrow(X)){
+  r_hat_dif_res = rep(NaN, end)
+  X_long = as.matrix(select(as_tibble(X), - r_cur_purch, -r_cur_purch_1, -date)) #!
   add_term = X_long %*% c(par[1:22])
   
-  r_hat_dif_res[4:end_2018] = fill_recursive(first_values = 13.3059, add_term = add_term[5:end_2018],
+  r_hat_dif_res[4:end] = fill_recursive(first_values = 13.3059, add_term = add_term[5:end],
                                              coefs = par[23]) # from 2006m04 to 2018m12
   r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) #from 2Q2006 to 4Q2018
   
   X_short = X %>% select( dum01:dum12, const, dif_brent, dif_brent_1, dif_usd_rub, dif_usd_rub_1,
                           dif_usd_eur, r_hat_cur_acc, r_hat_cur_acc_1,
                           r_cur_purch, r_cur_purch_1)
-  X_short_end = X_short[(109:end_2018), ]
+  X_short_end = X_short[(109:end), ]
   add_term_short = as.matrix(X_short_end) %*% c(par[11:22], par[25:34])
   r_dif_res_short = fill_recursive(first_values = r_hat_dif_res[108], 
                                    add_term = add_term_short,
@@ -271,32 +272,18 @@ make_pred_dif_res = function(par, X){
               r_hat_dif_res_short_quarter = r_hat_dif_res_short_quarter))
 }
 
-make_pred_cur_purch = function(par, X, end = nrow(X)){
-  r_hat_cur_purch = rep(0, end)
-  add_term = (as.matrix(X[3:end, 1:4]) %*% par[1:4])
-  r_hat_cur_purch[2:end] = fill_recursive(add_term = add_term, multiplier = X[3:end,5], coefs = par[5])
-  r_hat_cur_purch_quarter = roll_sum(r_hat_cur_purch, n = 3, by = 3) # рассчет квартальной выручки
-  return(list(r_hat_cur_purch = r_hat_cur_purch, 
-              r_hat_cur_purch_quarter = r_hat_cur_purch_quarter))
-}
-
 make_pred_rub_usd = function(par, X, R, end = nrow(X), mask){
-  hat_rub_usd_ratio = rep(NaN, end)
-  hat_rub_usd_ratio[2:3] = X$dif_usd_rub_ratio[2:3] 
-  
   add_term = as.matrix(X[4:end,1:10]) %*% c(par[1:10])
-  
-  hat_rub_usd_ratio[3:end] = fill_recursive(first_values = hat_rub_usd_ratio[3], add_term = add_term,
-                                            coefs = par[11]) # from 2006m04 to 2018m12
-  
+  X$dif_usd_rub_ratio[3:end] = fill_recursive(first_values = X$dif_usd_rub_ratio[3], add_term = add_term,
+                                              coefs = par[11]) # from 2006m04 to 2018m12
+  hat_rub_usd_ratio = X$dif_usd_rub_ratio
   hat_rub_usd = matrix(NaN, 8, end)
   hat_rub_usd[1:8, 1:3] = matrix(R[1:3,1], ncol = 3, nrow = 8, byrow = TRUE) 
   vector = 1 + hat_rub_usd_ratio
   real_values = matrix(R[1:end,1], ncol = end, nrow = 8, byrow = TRUE)
-  
   for (i in 1:nrow(hat_rub_usd)) {
     for (j in 4:ncol(hat_rub_usd)) {
-      if (mask[i,j] == 0){
+      if (mask[i,j] == 0) {
         hat_rub_usd[i,j] = hat_rub_usd[i, j-1] * vector[j]}
       else{
         hat_rub_usd[i,j] = real_values[i,j]
@@ -304,11 +291,24 @@ make_pred_rub_usd = function(par, X, R, end = nrow(X), mask){
       }
     }
   }
-  
-  hat_rub_usd_final = colMeans(hat_rub_usd)
+  hat_rub_usd_final = colMeans(hat_rub_usd, na.rm = TRUE)
   hat_rub_usd_quarter = roll_mean(hat_rub_usd_final, n = 3, by = 3)
   
   return(list(hat_rub_usd_final = hat_rub_usd_final, 
               hat_rub_usd_quarter = hat_rub_usd_quarter,
               hat_rub_usd = hat_rub_usd))
+}
+
+
+create_mask = function(n_months){
+  mask = matrix(0, 8, n_months)
+  mask[2,] = c(rep(1,3), rep(0, 2),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[3,] = c(rep(1,3), rep(0, 5),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[4,] = c(rep(1,3), rep(0, 8),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[5,] = c(rep(1,3), rep(0, 11),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[6,] = c(rep(1,3), rep(0, 14),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[7,] = c(rep(1,3), rep(0, 17),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[8,] = c(rep(1,3), rep(0, 20),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  mask[1,] = c(rep(1,3), rep(0, 23),1, rep(c(rep(0,23), 1), times = 8))[1:n_months]
+  return(mask)
 }
