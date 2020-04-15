@@ -468,7 +468,7 @@ X_difr = tibble(const = 1,
                 quarter = 0, 
                 r_cur_purch = all_vars$r_cur_purch,
                 r_cur_purch_1 = lag(all_vars$r_cur_purch, 1))
-
+X_difr
 
 X_difr_dummy = bind_cols(X_difr, select(all_vars, dum01:dum12))
 

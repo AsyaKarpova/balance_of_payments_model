@@ -249,7 +249,7 @@ make_pred_dif_res = function(par, X, end = nrow(X)){
   r_hat_dif_res = rep(NaN, end)
   X_long = as.matrix(select(as_tibble(X), - r_cur_purch, -r_cur_purch_1, -date)) #!
   add_term = X_long %*% c(par[1:22])
-  
+  print(X_long)
   r_hat_dif_res[4:end] = fill_recursive(first_values = 13.3059, add_term = add_term[5:end],
                                              coefs = par[23]) # from 2006m04 to 2018m12
   r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) #from 2Q2006 to 4Q2018

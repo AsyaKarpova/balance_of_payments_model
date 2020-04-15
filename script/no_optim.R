@@ -11,7 +11,7 @@ library(zoo)
 library(fable)
 library(lubridate)
 
-all_vars = import('data/vars_for_model.csv')
+all_vars = import('data/vars_for_model.csv') %>% mutate(date = yearmonth(date)) %>% as_tsibble()
 all_vars_quater = import('data/data_quarter.xlsx')
 par_model = import('script/gensa_par.Rds')
 
@@ -213,6 +213,7 @@ pred_imp = make_pred_imp(par_imp, X_imp, R_imp, end = end_2018)
 autoplot(ts.union(real_data = ts(all_vars$r_imp_goods, start = c(2006, 1), freq = 12),  
                   model = ts(pred_imp$r_hat_imp_gds, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from import of goods')
 
+
 #ggsave('imp_goods.png')
 
 autoplot(ts.union(real_data = ts(all_vars$r_imp_serv, start = c(2006, 1), freq = 12),  
@@ -232,6 +233,8 @@ r_hat_imp_all = pred_imp$r_imp_all[1:end_2018]
 
 mape_r_hat_imp_gds = mape(r_hat_imp_gds[(end_2018-12):end_2018], all_vars$r_imp_goods[(end_2018-12):end_2018])
 mape_r_hat_imp_serv = mape(r_hat_imp_serv[(end_2018-12):end_2018], all_vars$r_imp_serv[(end_2018-12):end_2018])
+
+
 mape_r_hat_imp_all = mape(r_hat_imp_all[(end_2018-12):end_2018], all_vars$r_imp_all[(end_2018-12):end_2018])
 
 ### Model for export of services
@@ -405,11 +408,9 @@ r_hat_cap_acc = c(unlist(import('data/r_hat_cap_account.csv')[1,]))
 #r_hat_cur_acc = r_hat_cap_acc[1:end_2018] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
 
 r_hat_cur_acc = r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
-
-r_hat_cur_acc = c(r_hat_cur_acc,rep(NaN, 12))
+r_hat_cur_acc = c(r_hat_cur_acc, rep(NaN, 12))
 
 X_difr = tibble(const = 1,
-                ###r_hat_difr = 1,
                 dif_brent = all_vars$dif_brent, 
                 dif_brent_cor = (all_vars$dif_brent * all_vars$vcor)/(all_vars$rub_usd_1),
                 dif_brent_1 = all_vars$brent_1 - all_vars$brent_2,
@@ -422,9 +423,9 @@ X_difr = tibble(const = 1,
                 r_cur_purch = all_vars$r_cur_purch,
                 r_cur_purch_1 = lag(all_vars$r_cur_purch, 1))
 
-
-X_difr_dummy = cbind(X_difr, select(all_vars, dum01:dum12))
-
+X_difr
+X_difr_dummy = bind_rows(X_difr, select(all_vars, `dum01`:`dum12`))
+View(X_difr_dummy)
 R_dif_reserves = all_vars %>% 
   select(r_dif_reserves) %>%
   rename('r_real' = 'r_dif_reserves')
@@ -434,35 +435,9 @@ R_dif_reserves_quarter = all_vars_quater %>%
   rename('r_real' = 'r_dif_reserves') %>%
   na.omit()
 
-make_pred_dif_res = function(par, X){
-  r_hat_dif_res = rep(NaN, end_2018)
-  X_long = as.matrix(select(X, - r_cur_purch, -r_cur_purch_1))
-  add_term = X_long %*% c(par[1:22])
-  
-  r_hat_dif_res[4:end_2018] = fill_recursive(first_values = 13.3059, add_term = add_term[5:end_2018],
-                                             coefs = par[23]) # from 2006m04 to 2018m12
-  r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) #from 2Q2006 to 4Q2018
-  
-  X_short = X %>% select( dum01:dum12, const, dif_brent, dif_brent_1, dif_usd_rub, dif_usd_rub_1,
-                          dif_usd_eur, r_hat_cur_acc, r_hat_cur_acc_1,
-                          r_cur_purch, r_cur_purch_1)
-  X_short_end = X_short[(109:end_2018), ]
-  add_term_short = as.matrix(X_short_end) %*% c(par[11:22], par[25:34])
-  r_dif_res_short = fill_recursive(first_values = r_hat_dif_res[108], 
-                                   add_term = add_term_short,
-                                   coefs = par[24]) # from 2006m04 to 2018m12
-  
-  r_hat_dif_res_short = c(r_hat_dif_res[1:107], r_dif_res_short) #prediction from 2015m01
-  r_hat_dif_res_short_quarter = roll_sum(r_hat_dif_res_short, n = 3, by = 3) #from 2Q2006 to 4Q2018
-  
-  return(list(r_hat_dif_res = r_hat_dif_res, 
-              r_hat_dif_res_quarter = r_hat_dif_res_quarter,
-              r_hat_dif_res_short = r_hat_dif_res_short, 
-              r_hat_dif_res_short_quarter = r_hat_dif_res_short_quarter))
-}
 
 
-pred_res = make_pred_dif_res(par_difr_res, X_difr_dummy)
+pred_res = make_pred_dif_res(par_difr_res, X_difr_dummy, end = end_2018)
 
 r_hat_dif_res = pred_res$r_hat_dif_res 
 r_hat_dif_res_quarter = pred_res$r_hat_dif_res_quarter
