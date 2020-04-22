@@ -73,7 +73,7 @@ all_vars = full_join(all_vars_tsb, exog_full) %>%
 
 
 
-all_vars[is.na(all_vars$dum_1114),]['dum_1114'] = 0
+all_vars[is.na(all_vars$dum_1114),]['dum_1114'] = 1
 all_vars[is.na(all_vars$dum_2012),]['dum_2012'] = 0
 all_vars = all_vars%>% mutate(r_price_cur_purch = ifelse(r_dum_cur_purch == 0, 0, r_price_cur_purch))
 all_vars = create_tibble(all_vars)
@@ -449,12 +449,9 @@ pred_erros = make_pred_errors(par_errors, X_errors)
 r_hat_errors = pred_erros$r_hat_errors
 
 autoplot(ts.union(real_data = ts(all_vars$r_errors, start = c(2006, 1), freq = 12),  
-                  model = ts(r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('net errors and omissions')
-
-
+                  model = ts(r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('net errors and omissions')r_hat_cur_acc = r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
 
 r_hat_cur_acc = r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
-
 
 X_difr = tibble(const = 1,
                 dif_brent = all_vars$dif_brent, 
@@ -468,7 +465,7 @@ X_difr = tibble(const = 1,
                 quarter = 0, 
                 r_cur_purch = all_vars$r_cur_purch,
                 r_cur_purch_1 = lag(all_vars$r_cur_purch, 1))
-X_difr
+
 
 X_difr_dummy = bind_cols(X_difr, select(all_vars, dum01:dum12))
 
@@ -484,3 +481,4 @@ r_hat_dif_res_short_quarter = pred_res$r_hat_dif_res_short_quarter
 
 autoplot(ts.union(real_data = ts(all_vars$r_dif_reserves, start = c(2006, 1), freq = 12),  
                   model = ts(r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('change') + xlab('') + ggtitle('Difference of reserves')
+

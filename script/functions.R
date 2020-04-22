@@ -134,9 +134,9 @@ make_pred_op = function(par, X, R, end = nrow(X)){
                p_hat_op = lag(p_hat_op, 1))
   X_v_by_par = as.matrix(X_v) %*% par[6:9]
   dummies = rep(c(par[10:15], 1, par[16:20]), end/12)
-  v_hat_op = rep(NA, end)
   v_hat_op = X_v_by_par * dummies
   v_hat_op[1:5] = R$v_exp_op[1:5]
+  v_hat_op = as.vector(v_hat_op)
   r_hat_op = p_hat_op * v_hat_op
   v_hat_op_quarter = roll_sum(v_hat_op, n = 3, by = 3) 
   r_hat_op_quarter = roll_sum(r_hat_op, n = 3, by = 3) 

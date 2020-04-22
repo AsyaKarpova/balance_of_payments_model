@@ -12,7 +12,10 @@ library(fable)
 library(lubridate)
 
 all_vars = import('data/vars_for_model.csv') %>% mutate(date = yearmonth(date)) %>% as_tsibble()
-all_vars_quater = import('data/data_quarter.xlsx')
+all_vars_quater = import('data/data_quarter_new.xlsx') 
+quater_date = all_vars_quater$date
+all_vars_quater = select(all_vars_quater, -date)/1000
+all_vars_quater = mutate(all_vars_quater, date = quater_date)
 par_model = import('script/gensa_par.Rds')
 
 source('script/functions.R')
@@ -70,6 +73,9 @@ autoplot(ts.union(real_data = ts(all_vars$v_exp_oil[1:end_2018], start = c(2006,
 autoplot(ts.union(real_data = ts(all_vars$r_exp_oil[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_oil$r_hat_oil, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
 
+autoplot(ts.union(real_data = ts(all_vars_quater$r_exp_oil, start = c(2006, 1), freq = 4),  
+                  model = ts(pred_oil$r_hat_oil_quarter, start = c(2006, 1), freq = 4))) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
+
 
 #ggsave('oil_r.png')   
 
@@ -109,6 +115,8 @@ autoplot(ts.union(real_data = ts(all_vars$v_exp_op[1:end_2018], start = c(2006, 
 autoplot(ts.union(real_data = ts(all_vars$r_exp_op[1:end_2018], start = c(2006, 1), freq = 12),  
                   model = ts(pred_op$r_hat_op, start = c(2006, 1), freq = 12))) + ylab('r_exp_op') + xlab('') + ggtitle('Average revenue from export of oil products')
 
+autoplot(ts.union(real_data = ts(all_vars_quater$v_exp_op, start = c(2006, 1), freq = 4),  
+                  model = ts(pred_op$v_hat_op_quarter, start = c(2006, 1), freq = 4))) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
 #ggsave('op_r.png')
 
 mape_v_hat_op = mape(pred_op$v_hat_op[(end_2013-12):end_2013], all_vars$v_exp_op[(end_2013-12):end_2013])
@@ -401,14 +409,8 @@ smape(r_hat_errors[(end_2018-12):end_2018], all_vars$r_errors[(end_2018-12):end_
 
 
 ### models for difference of reserves
-
-r_hat_cap_acc = c(unlist(import('data/r_hat_cap_account.csv')[1,]))
-
-# until 2018Q12
-#r_hat_cur_acc = r_hat_cap_acc[1:end_2018] + r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
-
 r_hat_cur_acc = r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
-r_hat_cur_acc = c(r_hat_cur_acc, rep(NaN, 12))
+
 
 X_difr = tibble(const = 1,
                 dif_brent = all_vars$dif_brent, 
@@ -417,28 +419,19 @@ X_difr = tibble(const = 1,
                 dif_usd_rub = all_vars$dif_usd_rub,
                 dif_usd_rub_1 = all_vars$rub_usd_1 - all_vars$rub_usd_2,
                 dif_usd_eur = all_vars$dif_usd_eur,
-                r_hat_cur_acc = r_hat_cur_acc,
-                r_hat_cur_acc_1 = lag(r_hat_cur_acc, 1),
-                quarter = rep((all_vars_quater$r_dif_reserves)/3, each = 3), 
-                r_cur_purch = all_vars$r_cur_purch,
-                r_cur_purch_1 = lag(all_vars$r_cur_purch, 1))
+                quarter = 0,
+                r_cur_purch = all_vars$r_cur_purch, 
+                r_cur_purch_1 = lag(all_vars$r_cur_purch,1))
+X_difr = X_difr[1:end_2018, ] %>% mutate(r_hat_cur_acc = r_hat_cur_acc,
+                                     r_hat_cur_acc_1 = lag(r_hat_cur_acc, 1),)
 
-X_difr
-X_difr_dummy = bind_rows(X_difr, select(all_vars, `dum01`:`dum12`))
-View(X_difr_dummy)
+X_difr_dummy = bind_cols(X_difr, select(all_vars[1:end_2018, ], dum01:dum12))
+X_difr_dummy
 R_dif_reserves = all_vars %>% 
   select(r_dif_reserves) %>%
   rename('r_real' = 'r_dif_reserves')
-
-R_dif_reserves_quarter = all_vars_quater %>% 
-  select(r_dif_reserves) %>%
-  rename('r_real' = 'r_dif_reserves') %>%
-  na.omit()
-
-
-
-pred_res = make_pred_dif_res(par_difr_res, X_difr_dummy, end = end_2018)
-
+pred_res = make_pred_dif_res(par_difr_res, X_difr_dummy)
+par_difr_res
 r_hat_dif_res = pred_res$r_hat_dif_res 
 r_hat_dif_res_quarter = pred_res$r_hat_dif_res_quarter
 r_hat_dif_res_short = pred_res$r_hat_dif_res_short
@@ -498,37 +491,27 @@ mape_cur_purch = mape(r_hat_cur_purch[(end_2018-12):(end_2018-3)], all_vars$r_cu
 X_rub_usd = tibble(const = 1, 
                    dif_brent_ratio = all_vars$dif_brent_ratio,
                    dif_brent_ratio_1114 = all_vars$dum_1114 * dif_brent_ratio,
-                   dif_brent_ratio_cor = (all_vars$vcor*dif_brent_ratio)/all_vars$rub_usd_1, 
+                   dif_brent_ratio_cor = (all_vars$vcor*dif_brent_ratio)/mean(all_vars$rub_usd_1, na.rm = TRUE), 
                    dif_r_1114 = all_vars$dif_r * all_vars$dum_1114, 
                    r_cur_purch = all_vars$r_cur_purch,
                    r_cur_purch_1 = lag(all_vars$r_cur_purch, 1),
                    dif_usd_eur_ratio = all_vars$dif_usd_eur_ratio,
                    em_index_ratio = all_vars$dif_em_index_ratio,
                    em_index_ratio_1114 = em_index_ratio * all_vars$dum_1114,
-                   dif_usd_rub_ratio = all_vars$dif_usd_rub_ratio)
+                   dif_usd_rub_ratio = all_vars$dif_usd_rub_ratio,
+                   date = all_vars$date) %>% as_tsibble()
 
-
-R_rub_usd = all_vars %>% 
+R_rub_usd = as_tibble(all_vars) %>% 
   select(rub_usd) %>%
-  rename('r_real' = 'rub_usd')
-
+  rename('r_real' = 'rub_usd') %>% as.data.frame()
 
 R_rub_usd_quarter = roll_mean(R_rub_usd$r_real, n = 3, by = 3)
 
+mask = create_mask(nrow(all_vars))
 
-mask = matrix(0, 8, end_2018)
-mask[1,] = c(rep(1,3), rep(0, 23),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[2,] = c(rep(1,3), rep(0, 2),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[3,] = c(rep(1,3), rep(0, 5),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[4,] = c(rep(1,3), rep(0, 8),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[5,] = c(rep(1,3),rep(0, 11),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[6,] = c(rep(1,3),rep(0, 14),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[7,] = c(rep(1,3),rep(0, 17),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-mask[8,] = c(rep(1,3),rep(0, 20),1,rep(c(rep(0,23), 1), times=7))[1:end_2018]
-
-
-pred_rub_usd = make_pred_rub_usd(par_rub_usd, X_rub_usd,R_rub_usd,mask = mask, end = end_2018)
+pred_rub_usd = make_pred_rub_usd(par_rub_usd, X_rub_usd,R_rub_usd, mask=mask)
 hat_rub_usd_final = pred_rub_usd$hat_rub_usd_final
+
 
 autoplot(ts.union(real_data = ts(all_vars$rub_usd, start = c(2006, 1), freq = 12),  
                   model = ts(hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('exchange rate') + xlab('') + ggtitle('Exchange rate (rub/usd)')
