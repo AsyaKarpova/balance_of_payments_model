@@ -20,6 +20,7 @@ library(skimr)
 all_vars = import('data/all_vars_pred.csv') %>%
   mutate(date = yearmonth(date)) %>%
   as_tsibble()
+export(all_vars, 'data/all_vars_scenarios.xlsx')
 all_vars = all_vars %>% mutate(em_index_ratio = em_index / lag(em_index, 1))
 all_vars = all_vars %>% filter(year(date) > 2011, year(date) < 2020)
 source('script/functions.R')

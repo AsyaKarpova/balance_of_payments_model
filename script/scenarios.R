@@ -7,7 +7,7 @@ library(stats)
 library(Metrics)
 library(tidyverse)
 library(tsibble)
-library(zoo)
+library(rlang)
 library(fable)
 library(lubridate)
 
@@ -31,6 +31,7 @@ long_exog = exog %>%
   pivot_longer(-date, names_to = 'series', values_to = 'value') %>% drop_na()
 
 exog_tsb = long_exog %>% as_tsibble(index = date, key = series)
+exog_tsb
 
 #long_exog %>% group_by(series) %>% top_n(date, n=1)
 
@@ -68,18 +69,21 @@ all_vars_tsb = data %>%
   pivot_longer(-date, names_to = 'series', values_to = 'value') %>%
   drop_na() %>%
   as_tsibble(index = date, key = series)
+all_vars_tsb %>% filter(year(date) == 2019) %>% as_tibble() %>% group_by(series)  %>% summarise(value_2019 = sum(value)) %>% View()
 
 all_vars = full_join(all_vars_tsb, exog_full) %>%
   filter(year(date) < 2021) %>% spread(series, value)
 
-
-
 all_vars[is.na(all_vars$dum_1114),]['dum_1114'] = 1
 all_vars[is.na(all_vars$dum_2012),]['dum_2012'] = 0
-all_vars = all_vars%>% mutate(r_price_cur_purch = ifelse(r_dum_cur_purch == 0, 0, r_price_cur_purch))
-all_vars = create_tibble(all_vars)
-all_vars %>% filter(year(date)< 2020) %>% tail() %>% View()
-export(all_vars, 'data/all_vars_pred.csv')
+#all_vars = all_vars %>% mutate(r_price_cur_purch = ifelse(r_dum_cur_purch == 0, 0, r_price_cur_purch))
+
+#### сценарий!!!!
+#https://cbr.ru/Collection/Collection/File/27833/forecast_200424.pdf
+# BRENT - 27, 35, 45
+all_vars1 = all_vars %>% mutate(brent = if_else(year(date) == 2020, 27, brent))
+
+#export(all_vars, 'data/all_vars_pred.csv')
 ### parameters from gensa
 par_oil = par_model$par_oil
 par_gas = par_model$par_gas
@@ -96,14 +100,16 @@ par_difr_res = par_model$par_difr_res
 par_cur_purch = par_model$par_cur_purch
 par_rub_usd = par_model$par_rub_usd
 
-## cur purchase
+
+a = predict_bp(all_vars, par_model)
+a%>%tail()%>% View()
 X_cur = tibble(r_price_cur_purch = all_vars$r_price_cur_purch,
                brent = all_vars$brent,
                brent_1 = all_vars$brent_1,
                brent_2 = all_vars$brent_2,
                r_dum_cur_purch = all_vars$r_dum_cur_purch)
 
-
+all_vars$brent
 R_cur = all_vars %>%
   select(r_cur_purch) %>%
   rename('r_real' = 'r_cur_purch')
