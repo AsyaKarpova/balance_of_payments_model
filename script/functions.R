@@ -94,7 +94,7 @@ make_pred_cur_purch = function(par, X, end = nrow(X)){
   return(list(r_hat_cur_purch = r_hat_cur_purch,
               r_hat_cur_purch_quarter = r_hat_cur_purch_quarter))
 }
-
+par_oil
 make_pred_oil = function(par, X, R, end = nrow(X)){
   X = X[1:end, ]
   X_p = as.matrix(X[, 1:3])
@@ -245,25 +245,27 @@ make_pred_errors = function(par, X, end = nrow(X)){
               r_hat_errors_quarter = r_hat_errors_quarter))
 }
 
-make_pred_dif_res = function(par, X, end = nrow(X)){
-  r_hat_dif_res = rep(NaN, end)
-  X_long = as.matrix(select(as_tibble(X), - r_cur_purch, -r_cur_purch_1, -date)) #!
-  add_term = X_long %*% c(par[1:22])
-  print(X_long)
-  r_hat_dif_res[4:end] = fill_recursive(first_values = 13.3059, add_term = add_term[5:end],
-                                             coefs = par[23]) # from 2006m04 to 2018m12
-  r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3) #from 2Q2006 to 4Q2018
+make_pred_dif_res = function(par, X, end = nrow(X), fv = c(0,0,12.38856924, 13.30591146)){
+  X_long = filter(X, year(date) < 2015)
+  X_2015 = as.matrix(select(as_tibble(X_long), - r_cur_purch, -r_cur_purch_1, -date)) #!
+  if (nrow(X_2015) != 0) {
+    add_term = X_2015 %*% c(par[1:22])
+    r_hat_dif_res = rep(NaN, nrow(X_2015))
+    r_hat_dif_res[(length(fv)+1):nrow(X_2015)] = fill_recursive(first_values = fv[length(fv)], add_term = add_term[(length(fv)+2):nrow(X_2015)],
+                                                                coefs = par[23]) # from 2006m04 to 2018m12
+    r_hat_dif_res_quarter = roll_sum(r_hat_dif_res, n = 3, by = 3)} #from 2Q2006 to 4Q2018
 
   X_short = X %>% select( dum01:dum12, const, dif_brent, dif_brent_1, dif_usd_rub, dif_usd_rub_1,
                           dif_usd_eur, r_hat_cur_acc, r_hat_cur_acc_1,
-                          r_cur_purch, r_cur_purch_1)
-  X_short_end = X_short[(109:end), ]
+                          r_cur_purch, r_cur_purch_1, date) %>% as_tsibble()
+  X_short_end = filter(X_short, year(date) >= 2015) %>% as_tibble() %>% select(-date)
   add_term_short = as.matrix(X_short_end) %*% c(par[11:22], par[25:34])
-  r_dif_res_short = fill_recursive(first_values = r_hat_dif_res[108],
+  fv_2016 = if_else(nrow(X_long) != 0, tail(r_hat_dif_res, 1), tail(fv, 1))
+  r_dif_res_short = fill_recursive(first_values = fv_2016,
                                    add_term = add_term_short,
                                    coefs = par[24]) # from 2006m04 to 2018m12
 
-  r_hat_dif_res_short = c(r_hat_dif_res[1:107], r_dif_res_short) #prediction from 2015m01
+  r_hat_dif_res_short = c(tail(r_hat_dif_res, -1), r_dif_res_short) #prediction from 2015m01
   r_hat_dif_res_short_quarter = roll_sum(r_hat_dif_res_short, n = 3, by = 3) #from 2Q2006 to 4Q2018
 
   return(list(r_hat_dif_res = r_hat_dif_res,
@@ -322,7 +324,7 @@ prolonge_data = function(data, var_name, var_pred){
 
 
 predict_bp = function(data, par_model){
-  all_vars = create_tibble(all_vars)
+  all_vars = create_tibble(data)
   par_oil = par_model$par_oil
   par_gas = par_model$par_gas
   par_op = par_model$par_op
@@ -637,5 +639,15 @@ predict_bp = function(data, par_model){
   r_hat_dif_res_short = pred_res$r_hat_dif_res_short
   r_hat_dif_res_short_quarter = pred_res$r_hat_dif_res_short_quarter
   all_vars = prolonge_data(all_vars, 'r_dif_reserves', r_hat_dif_res_short)
-  return(all_vars)
+  predictions = list(r_hat_dif_res_short = r_hat_dif_res_short, r_hat_cur_acc = r_hat_cur_acc, r_hat_wage = r_hat_wage,
+                     r_hat_errors = r_hat_errors,r_hat_inv = r_hat_inv, r_hat_rent_sinc = r_hat_rent_sinc,r_hat_bal_serv = r_hat_bal_serv,
+                     r_hat_bal_trade = r_hat_bal_trade, r_hat_exp_all = r_hat_exp_all, r_hat_exp_serv = r_hat_exp_serv, hat_rub_usd_final = hat_rub_usd_final,
+                     v_hat_gas = v_hat_gas,v_hat_oil = v_hat_oil,v_hat_op = v_hat_op,
+                     p_hat_gas = p_hat_gas, p_hat_op = p_hat_op, p_hat_oil = p_hat_oil,
+                     r_hat_oil = r_hat_oil, r_hat_op = r_hat_op, r_hat_gas = r_hat_gas,
+                     r_hat_cur_purch = r_hat_cur_purch,
+                     r_hat_imp_all = r_hat_imp_all, r_hat_imp_gds = r_hat_imp_gds,
+                     r_hat_imp_serv = r_hat_imp_serv,
+                     r_hat_othg = r_hat_othg, r_hat_gds = r_hat_gds)
+  return(list(restored_data = all_vars, predictions = predictions))
 }
