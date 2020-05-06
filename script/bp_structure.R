@@ -46,3 +46,17 @@ left_join(brent, r_errors, by = 'date')
 r_errors
 ggplot(brent, aes(y = 100*r_errors, x = date)) + geom_line(colour = 'red', size=0.5) +
   geom_line(data = brent, aes(y = brent, x = date))+ xlab('') + ggtitle('Current account')
+
+names(all_data)
+all_data = import('data/data_quarter_new.xlsx')
+all_data%>% select(n_y, n_j, n_c, n_ex, n_im, n_ds)
+n_y = rep(all_data$n_y/3, each = 3)
+n_c = rep(all_data$n_c/3, each = 3)
+n_j = rep(all_data$n_j/3, each = 3)
+n_ex = rep(all_data$n_ex/3, each = 3)
+n_im = rep(all_data$n_im/3, each = 3)
+n_ds = rep(all_data$n_ds/3, each = 3)
+n_g = rep(all_data$n_g/3, each = 3)
+prolonged_n = data.frame(n_y, n_c, n_j, n_ex, n_im, n_ds, n_g)/1000
+export(prolonged_n, 'prol_n.csv')
+

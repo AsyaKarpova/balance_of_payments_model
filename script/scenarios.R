@@ -14,11 +14,11 @@ library(lubridate)
 
 data = import('data/data_month.xlsx') %>%
   mutate(date = yearmonth(date))
-all_vars_quater = import('data/data_quarter.xlsx')
+all_vars_quater = import('data/data_quarter_new.xlsx')
 par_model = import('script/gensa_par.Rds')
 source('script/functions.R')
-
-
+ncol(data)
+names(all_vars)
 ### exogenous vars for scenarios
 
 exog = data %>% select(date, brent, gas_lng, gas_europe, usd_eur,
@@ -79,13 +79,13 @@ all_vars_tsb = data %>%
   pivot_longer(-date, names_to = 'series', values_to = 'value') %>%
   drop_na() %>%
   as_tsibble(index = date, key = series)
-all_vars_tsb %>% filter(year(date) == 2019) %>% as_tibble() %>% group_by(series)  %>% summarise(value_2019 = sum(value)) %>% View()
 
 all_vars = full_join(all_vars_tsb, exog_full) %>%
-  filter(year(date) < 2021) %>% spread(series, value)
+  filter(year(date) < 2020) %>% spread(series, value)
 
 all_vars[is.na(all_vars$dum_1114),]['dum_1114'] = 1
 all_vars[is.na(all_vars$dum_2012),]['dum_2012'] = 0
+
 #all_vars = all_vars %>% mutate(r_price_cur_purch = ifelse(r_dum_cur_purch == 0, 0, r_price_cur_purch))
 
 #### сценарий!!!!
@@ -113,8 +113,6 @@ pred_untill_2021_neg = predict_bp(all_vars3, par_model)
 
 restored_data_2021_neg = pred_untill_2021_base[[1]]
 predictions_2021_neg = pred_untill_2020[[2]]
-
-
 
 
 

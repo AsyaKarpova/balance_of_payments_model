@@ -88,13 +88,16 @@ create_tibble = function(data_raw){
 
 make_pred_cur_purch = function(par, X, end = nrow(X)){
   r_hat_cur_purch = rep(0, end)
-  add_term = (as.matrix(X[3:end, 1:4]) %*% par[1:4])
-  r_hat_cur_purch[2:end] = fill_recursive(add_term = add_term, multiplier = X[3:end,5], coefs = par[5])
+  add_term = (as.matrix(X[3:end, 1:4]) %*% par[2:5])
+  print(tail(X,20))
+  print(add_term)
+  r_hat_cur_purch[2:end] = fill_recursive(add_term = add_term, multiplier = X[3:end,5], coefs = par[1])
   r_hat_cur_purch_quarter = roll_sum(r_hat_cur_purch, n = 3, by = 3) # рассчет квартальной выручки
+
   return(list(r_hat_cur_purch = r_hat_cur_purch,
               r_hat_cur_purch_quarter = r_hat_cur_purch_quarter))
 }
-par_oil
+
 make_pred_oil = function(par, X, R, end = nrow(X)){
   X = X[1:end, ]
   X_p = as.matrix(X[, 1:3])
@@ -337,7 +340,7 @@ predict_bp = function(data, par_model){
   par_inv = par_model$par_inv
   par_errors = par_model$par_errors
   par_difr_res = par_model$par_difr_res
-  par_cur_purch = par_model$par_cur_purch
+  par_cur_purch = par_model2$par_cur_purch
   par_rub_usd = par_model$par_rub_usd
 
   X_cur = tibble(r_price_cur_purch = all_vars$r_price_cur_purch,
@@ -639,6 +642,9 @@ predict_bp = function(data, par_model){
   r_hat_dif_res_short = pred_res$r_hat_dif_res_short
   r_hat_dif_res_short_quarter = pred_res$r_hat_dif_res_short_quarter
   all_vars = prolonge_data(all_vars, 'r_dif_reserves', r_hat_dif_res_short)
+
+  hat_fin_bal = r_hat_errors + r_hat_cur_acc - r_hat_dif_res_short
+  all_vars = prolonge_data(all_vars, 'r_bal_fin', hat_fin_bal)
   predictions = list(r_hat_dif_res_short = r_hat_dif_res_short, r_hat_cur_acc = r_hat_cur_acc, r_hat_wage = r_hat_wage,
                      r_hat_errors = r_hat_errors,r_hat_inv = r_hat_inv, r_hat_rent_sinc = r_hat_rent_sinc,r_hat_bal_serv = r_hat_bal_serv,
                      r_hat_bal_trade = r_hat_bal_trade, r_hat_exp_all = r_hat_exp_all, r_hat_exp_serv = r_hat_exp_serv, hat_rub_usd_final = hat_rub_usd_final,
@@ -648,6 +654,8 @@ predict_bp = function(data, par_model){
                      r_hat_cur_purch = r_hat_cur_purch,
                      r_hat_imp_all = r_hat_imp_all, r_hat_imp_gds = r_hat_imp_gds,
                      r_hat_imp_serv = r_hat_imp_serv,
-                     r_hat_othg = r_hat_othg, r_hat_gds = r_hat_gds)
+                     r_hat_othg = r_hat_othg, r_hat_gds = r_hat_gds,
+                     r_hat_cur_acc = r_hat_cur_acc,
+                     hat_fin_bal = hat_fin_bal)
   return(list(restored_data = all_vars, predictions = predictions))
 }
