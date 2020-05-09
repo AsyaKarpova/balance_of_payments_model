@@ -12,7 +12,10 @@ library(fable)
 library(lubridate)
 
 data = import('data/data_month1.xlsx')
-prices_quater = import('data/data_quarter_new.xlsx')
+data_quater = import('data/data_quarter_new.xlsx')
+all_vars_quater = mutate_at(data_quater, vars(-date), ~ . / 1000)
+
+
 
 # gas, op, oil monthly data until 2013Q12 (end_2013 obs.)
 # export, import, n_' until 2018Q12 (end_2018 obs.)
@@ -26,6 +29,9 @@ endog = data %>% select(-c(brent, gas_lng, gas_europe, usd_eur,
                            rate_repo, rate_10tr, r_price_cur_purch,
                            r_dum_cur_purch, em_index, dum01:dum12, vcor)) %>% mutate(r_bal_rent_sinc = r_bal_rent + r_bal_sinc)
 
+endog = data %>% select(date, r_bal_wage, rub_usd)
+
+
 endog = mutate(endog, date = yearmonth(date))  %>%filter(year(date) <=2019)
 
 long_table = endog %>%
@@ -34,15 +40,15 @@ long_table = endog %>%
 series_tsb = long_table %>% as_tsibble(index = date, key = series)
 series_tsb1 = series_tsb %>% fill_gaps()
 
-test_data = series_tsb1 %>% group_by(series) %>% filter(date >= as.Date(max(date)) - months(12))
-train_data = series_tsb1 %>% group_by(series) %>% filter(date < as.Date(max(date)) - months(12))
+test_data = series_tsb1 %>% group_by(series) %>% filter(date >= as.Date(max(date)) - months(11))
+train_data = series_tsb1 %>% group_by(series) %>% filter(date < as.Date(max(date)) - months(11))
 
 
 #test_data = series_tsb1 %>% group_by(series) %>% filter(year(date) == 2019)
 #train_data = series_tsb1 %>% group_by(series) %>% filter(year(date) < 2019)
 
 # models
-train_data %>% filter(series=='r_cur_purch') %>% tail(15)
+
 series_models = train_data %>%
   model(
     snaive = SNAIVE(value ~ lag('year')),
@@ -54,11 +60,35 @@ series_models = train_data %>%
 
 series_forecasts = series_models %>%
   forecast(h = "1 year")
-strange_fcst = series_forecasts %>% filter(.model=="arima", series == "r_cur_purch")
-strange_fcst
+
+get_mase = function(the_model, the_series) {
+  .yhat = filter(series_forecasts, .model == the_model,
+                 series == the_series) %>% pull(value)
+  .ytrue = filter(series_tsb1, series == the_series) %>% tail(12)%>%
+    pull(value)
+  print(the_model)
+  print(the_series)
+  return(mase(.ytrue, .yhat))
+}
+get_mase("ets", "aq_assets")
+get_mase("snaive", "p_exp_gas")
+mase(c(0,0,0), c(0,0,0))
+series_forecasts %>%filter(.model =='snaive', series == 'p_exp_gas')
+series_tsb1 %>%filter(series == 'p_exp_gas', year(date) ==2019)
+.mase_table = cross_df(list(model = unique(series_forecasts$.model),
+                            series = unique(series_forecasts$series)))
+.mase_table
+.mase_table = mutate(.mase_table,
+                     mase = map2_dbl(model, series, ~ get_mase(.x, .y)))
+.mase_table
+
+op_usd_rub = series_forecasts %>% as_tibble %>% select(-.distribution)
+
+export(op_usd_rub, 'wage_usd_rub.xlsx')
+
 
 series_forecasts %>%
-  filter(series %in% c('r_bal_inv', 'r_imp_serv', 'p_exp_gas')) %>%
+  filter(series %in% c('r_bal_wage')) %>%
   autoplot(series_tsb1, level = NULL) +
   xlab("Year") + ylab("price")
 
@@ -66,6 +96,7 @@ series_forecasts %>%
   filter(series %in% c('p_exp_gas', 'p_exp_op', 'p_exp_oil')) %>%
   autoplot(series_tsb1, level = NULL) +
   xlab("Year") + ylab("price")
+
 
 series_forecasts %>%
   filter(series %in% c('r_bal_fin', 'r_errors', 'r_dif_reserves')) %>%
@@ -78,7 +109,6 @@ mape = series_forecasts %>%
   arrange(MAPE)
 
 
-test_data %>% filter(series == "r_cur_purch")
 mase = mape %>% select(.model, series, MAE)
 mase
 mase_l = mase %>% pivot_longer(cols = MAE)
@@ -183,12 +213,14 @@ a = long_table %>% ungroup() %>% count(series) %>% filter(n==84) %>% select(seri
 
 mase_b%>%View()
 mase_our = import('mase_table_pse.Rds')
-mase_our$.model = 'bp_model'
-mase_b = import('mase_bench.Rds')
-
-all_metrics = bind_rows(mase_our, mase_b) %>% select(series, mase, `.model`)
-all_metr = all_metrics %>% spread( key = '.model', value = 'mase') %>% filter(series != 'aq_assets', series != 'aq_obl', series!= 'r_bal_sinc', series != 'r_bal_rent', series != 'r_cap_account')
-
+mase_our$model = 'bp_model'
+mase_b = .mase_table
+mase_b
+all_metrics = bind_rows(mase_our, mase_b) %>% select(series, mase, `model`)
+all_metr = all_metrics %>% spread( key = 'model', value = 'mase') %>% filter(series != 'aq_assets', series != 'aq_obl', series!= 'r_bal_sinc', series != 'r_bal_rent', series != 'r_cap_account')
+all_metr = all_metr %>% select(series, bp_model, arima, ets, snaive)
 library(xtable)
-a = xtable(all_metr, caption = 'MASE')
+a = xtable(all_metr[1:5], caption = 'MASE')
 b = printbold(a, each = 'row')
+print(a, include.rownames=FALSE)
+all_metr %>% View()

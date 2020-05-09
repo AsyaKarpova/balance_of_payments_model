@@ -89,8 +89,6 @@ create_tibble = function(data_raw){
 make_pred_cur_purch = function(par, X, end = nrow(X)){
   r_hat_cur_purch = rep(0, end)
   add_term = (as.matrix(X[3:end, 1:4]) %*% par[2:5])
-  print(tail(X,20))
-  print(add_term)
   r_hat_cur_purch[2:end] = fill_recursive(add_term = add_term, multiplier = X[3:end,5], coefs = par[1])
   r_hat_cur_purch_quarter = roll_sum(r_hat_cur_purch, n = 3, by = 3) # рассчет квартальной выручки
 
@@ -188,7 +186,7 @@ make_pred_exp = function(par, X, R, end = nrow(X)){
   r_hat_othg = rep(NA, end)
   r_hat_othg = (as.matrix(X) %*% par[1:4]) * dummies
   r_hat_othg[1] = R$r_exp_othg[1]
-
+  r_hat_othg = as.vector(r_hat_othg)
   r_hat_othg_quarter = roll_sum(r_hat_othg, n = 3, by = 3) # рассчет квартальной выручки
 
   r_hat_gds = X$r_hat_oog + r_hat_othg
@@ -200,12 +198,12 @@ make_pred_exp = function(par, X, R, end = nrow(X)){
 }
 
 make_pred_imp = function(par, X, R, end = nrow(X)){
-
   X = X[1:end, ]
   dummies_gds = rep(c(par[6:11], 1, par[12:16]), nrow(X)/12)
   r_hat_imp_gds = (as.matrix(X) %*% par[2:5]) * dummies_gds + par[1]
+  print(r_hat_imp_gds)
   r_hat_imp_gds[1] = R$r_imp_goods[1]
-
+  r_hat_imp_gds = as.vector(r_hat_imp_gds)
   r_hat_imp_gds_quarter = roll_sum(r_hat_imp_gds, n = 3, by = 3)
 
   X_serv = select(X, -r_hat_gds) %>% mutate(r_hat_imp_gds = r_hat_imp_gds)
@@ -225,6 +223,7 @@ make_pred_imp = function(par, X, R, end = nrow(X)){
 make_pred_exp_serv = function(par, X, R, end = nrow(X)){
   dummies = rep(c(par[4:9], 1, par[10:14]), nrow(X)/12)
   r_hat_exp_serv = (as.matrix(X) %*% par[1:3]) * dummies
+  r_hat_exp_serv = as.vector(r_hat_exp_serv)
   r_hat_exp_serv_quarter = roll_sum(r_hat_exp_serv, n = 3, by = 3) # рассчет квартальной выручки
   return(list(r_hat_exp_serv = r_hat_exp_serv,
               r_hat_exp_serv_quarter = r_hat_exp_serv_quarter))
@@ -235,6 +234,7 @@ make_pred_balances = function(par, X, R, end = nrow(X)){
   n_pred = ncol(X)
   dummies = rep(c(par[(n_pred + 1):(n_pred + 6)], 1, par[(n_pred + 7):(n_pred + 11)]), nrow(X)/12)
   r_hat = (as.matrix(X) %*% par[1:n_pred]) * dummies
+  r_hat = as.vector(r_hat)
   r_hat_quarter = roll_sum(r_hat, n = 3, by = 3)
   return(list(r_hat = r_hat,
               r_hat_quarter = r_hat_quarter))
@@ -243,6 +243,7 @@ make_pred_balances = function(par, X, R, end = nrow(X)){
 make_pred_errors = function(par, X, end = nrow(X)){
   r_hat_errors = X %>% as_tibble() %>% select(-date)%>%
     as.matrix() %*% c(par[1:8], 1, par[9:13])
+  r_hat_errors = as.vector(r_hat_errors)
   r_hat_errors_quarter = roll_sum(r_hat_errors, n = 3, by = 3)
   return(list(r_hat_errors = r_hat_errors,
               r_hat_errors_quarter = r_hat_errors_quarter))
@@ -260,7 +261,7 @@ make_pred_dif_res = function(par, X, end = nrow(X), fv = c(0,0,12.38856924, 13.3
 
   X_short = X %>% select( dum01:dum12, const, dif_brent, dif_brent_1, dif_usd_rub, dif_usd_rub_1,
                           dif_usd_eur, r_hat_cur_acc, r_hat_cur_acc_1,
-                          r_cur_purch, r_cur_purch_1, date) %>% as_tsibble()
+                          r_cur_purch, r_cur_purch_1, date) %>% as_tsibble(index = date)
   X_short_end = filter(X_short, year(date) >= 2015) %>% as_tibble() %>% select(-date)
   add_term_short = as.matrix(X_short_end) %*% c(par[11:22], par[25:34])
   fv_2016 = if_else(nrow(X_long) != 0, tail(r_hat_dif_res, 1), tail(fv, 1))
@@ -495,7 +496,7 @@ predict_bp = function(data, par_model){
     select(r_imp_goods, r_imp_serv, r_imp_all) %>% na.omit()
 
 
-  par_imp = c(par_imp_gds, par_imp_serv)
+  par_imp = par_imp
 
   pred_imp = make_pred_imp(par_imp, X_imp, R_imp)
 
@@ -659,3 +660,135 @@ predict_bp = function(data, par_model){
                      hat_fin_bal = hat_fin_bal)
   return(list(restored_data = all_vars, predictions = predictions))
 }
+
+#### optimisation
+
+error_opt_oil = function(par, X, R, R_quarter){
+  fcst = make_pred_oil(par, X, R)
+  error_p = pse(pred = fcst$p_hat_oil[1:end_2013], pred_quarter = fcst$p_hat_oil_quarter,
+                real = R$p_exp_oil[1:end_2013], real_quarter = R_quarter$p_exp_oil)
+  error_v = pse(pred = fcst$v_hat_oil[1:end_2013], pred_quarter = fcst$v_hat_oil_quarter,
+                real = R$v_exp_oil[1:end_2013], real_quarter = R_quarter$v_exp_oil)
+  error_r = pse(pred = fcst$r_hat_oil[1:end_2013], pred_quarter = fcst$r_hat_oil_quarter,
+                real = R$r_exp_oil[1:end_2013], real_quarter = R_quarter$r_exp_oil)
+  return(error_p + error_v + error_r)
+}
+
+
+error_opt_op = function(par, X, R, R_quarter){
+  frcst = make_pred_op(par, X, R)
+  error_p = pse(pred = frcst$p_hat_op[1:end_2013], pred_quarter = frcst$p_hat_op_quarter,
+                real = R$p_exp_op[1:end_2013], real_quarter = R_quarter$p_exp_op)
+
+  error_v = pse(pred = frcst$v_hat_op[1:end_2013], pred_quarter = frcst$v_hat_op_quarter,
+                real = R$v_exp_op[1:end_2013], real_quarter = R_quarter$v_exp_op)
+  error_r = pse(pred = frcst$r_hat_op[1:end_2013], pred_quarter = frcst$r_hat_op_quarter,
+                real = R$r_exp_op[1:end_2013], real_quarter = R_quarter$r_exp_op)
+  return(error_p + error_v + error_r)
+}
+
+
+error_opt_gas = function(par, X, R, R_quarter){
+  frcst = make_pred_gas(par, X, R)
+  error_p = pse(pred = frcst$p_hat_gas[1:end_2013], pred_quarter = frcst$p_hat_gas_quarter,
+                real = R$p_exp_gas[1:end_2013], real_quarter = R_quarter$p_exp_gas)
+  error_v = pse(pred = frcst$v_hat_gas[1:end_2013], pred_quarter = frcst$v_hat_gas_quarter,
+                real = R$v_exp_gas[1:end_2013], real_quarter = R_quarter$v_exp_gas)
+  error_r = pse(pred = frcst$r_hat_gas[1:end_2013], pred_quarter = frcst$r_hat_gas_quarter,
+                real = R$r_exp_gas[1:end_2013], real_quarter = R_quarter$r_exp_gas)
+  return(error_p + error_v + error_r)
+}
+
+
+error_opt_othg = function(par, X, R, R_quarter){
+  frcst = make_pred_exp(par, X, R)
+  error_othg = pse(pred = frcst$r_hat_othg[1:end_2013], pred_quarter = frcst$r_hat_othg_quarter,
+                   real = R$r_exp_othg[1:end_2013], real_quarter = R_quarter$r_exp_othg)
+  error_gds  = pse(pred = frcst$r_hat_gds, pred_quarter = frcst$r_hat_gds_quater,
+                   real = R$r_exp_goods, real_quarter = R_quarter$r_exp_goods)
+  error = error_gds + error_othg
+
+  return(error)
+}
+
+error_opt_imp = function(par, X, R, R_quarter){
+  frcst = make_pred_imp(par, X, R)
+  error_imp_gds = pse(pred = frcst$r_hat_imp_gds, pred_quarter = frcst$r_hat_imp_gds_quarter,
+                      real = R$r_imp_goods, real_quarter = R_quarter$r_imp_goods)
+
+  error_imp_serv  = pse(pred = tail(frcst$r_hat_imp_serv, -start_2012), pred_quarter = tail(frcst$r_hat_imp_serv_quarter, -2),
+                        real = tail(R$r_imp_serv, -start_2012), real_quarter = tail(R_quarter$r_imp_serv, -2))
+
+  error_imp_all  = pse(pred = tail(frcst$r_imp_all, -start_2012), pred_quarter = tail(frcst$r_imp_all_quarter, -2),
+                       real = tail(R$r_imp_all, -start_2012), real_quarter = tail(R_quarter$r_imp_all, -2))
+  error = error_imp_gds + error_imp_serv + error_imp_all
+  return(error)
+}
+
+error_opt_exp_serv = function(par, X, R, R_quarter){
+  frcst = make_pred_exp_serv(par, X, R)
+  error = pse(pred = tail(frcst$r_hat_exp_serv,-start_2012), pred_quarter = tail(frcst$r_hat_exp_serv_quarter, -2),
+              real = tail(R$r_exp_serv,-start_2012), real_quarter = tail(R_quarter$r_exp_serv, -2))
+  return(error)
+}
+
+error_opt_errors = function(par, X, R, R_quarter){
+  frcst = make_pred_errors(par, X)
+  error = pse_abs(pred = tail(frcst$r_hat,-start_2012), pred_quarter = tail(frcst$r_hat_quarter, -2),
+                  real = tail(R$r_real,-start_2012), real_quarter = tail(R_quarter$r_real, -2))
+  return(error)
+}
+
+
+error_opt_balances = function(par, X, R, R_quarter){
+  frcst = make_pred_balances(par, X, R)
+  error = pse_abs(pred = tail(frcst$r_hat, -start_2012), pred_quarter = tail(frcst$r_hat_quarter, -2),
+                  real = tail(R$r_real, -start_2012), real_quarter = tail(R_quarter$r_real, -2))
+  return(error)
+}
+
+error_opt_dif_res = function(par, X, R, R_quarter){
+  frcst = make_pred_dif_res(par, X)
+  error_long = pse_abs(pred = frcst$r_hat_dif_res[start_2012:108],
+                       pred_quarter = tail(frcst$r_hat_dif_res_quarter, -3),
+                       real = R$r_real[start_2012:108],
+                       real_quarter = R_quarter$r_real[4:length(frcst$r_hat_dif_res_quarter)])
+  error_short = pse_abs(pred = frcst$r_hat_dif_res_short[109:length(frcst$r_hat_dif_res)], pred_quarter = tail(frcst$r_hat_dif_res_short_quarter, -2),
+                        real = R$r_real[109:length(frcst$r_hat_dif_res)], real_quarter = tail(R_quarter$r_real, -2))
+  error = error_short + error_long
+  return(error)
+}
+
+
+error_opt_cur_purch = function(par, X, R, R_quarter){
+  frcst = make_pred_cur_purch(par, X)
+  error = pse_abs(pred = frcst$r_hat_cur_purch, pred_quarter = frcst$r_hat_cur_purch_quarter,
+                  real = R$r_real, real_quarter = R_quarter$r_real)
+  print(error)
+  return(error)
+}
+
+
+
+error_opt_rub_usd = function(par, X, R, R_quarter){
+  frcst = make_pred_rub_usd(par, X, R, mask)
+  hat_rub_usd_final = frcst$hat_rub_usd_final
+  hat_rub_usd = frcst$hat_rub_usd
+  hat_rub_usd_quarter = frcst$hat_rub_usd_quarter
+
+  real_values = matrix(R[1:nrow(R),1], ncol = nrow(R), nrow = 8, byrow = TRUE)
+  error_matrix = hat_rub_usd - real_values
+  error_month = apply(error_matrix, 1, pse0, y = real_values[1,])
+  error_month_mean = mean(error_month)
+  error_quarter = pse0(y = R_quarter[1:nrow(R_quarter)], yhat = hat_rub_usd_quarter)
+  error = error_month_mean + error_quarter
+  return(error)
+}
+
+error_opt_exp_serv = function(par, X, R, R_quarter){
+  frcst = make_pred_exp_serv(par, X, R)
+  error = pse(pred = tail(frcst$r_hat_exp_serv,-start_2012), pred_quarter = tail(frcst$r_hat_exp_serv_quarter, -2),
+              real = tail(R$r_exp_serv,-start_2012), real_quarter = tail(R_quarter$r_exp_serv, 2))
+  return(error)
+}
+

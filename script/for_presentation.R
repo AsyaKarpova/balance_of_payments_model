@@ -15,9 +15,10 @@ library(tikzDevice)
 library(patchwork)
 
 
-data = import('data/data_month.xlsx') %>%
+data = import('data/data_month1.xlsx') %>%
   mutate(date = yearmonth(date))
 all_vars_quater = import('data/data_quarter_new.xlsx')
+all_vars_quater = mutate_at(all_vars_quater, vars(-date), ~ . / 1000)
 par_model = import('script/gensa_par.Rds')
 par_model2 = import('script/par_model.Rds')
 source('script/functions.R')
@@ -29,8 +30,10 @@ exog = data %>% select(date, brent, gas_lng, gas_europe, usd_eur,
                        v_prod_oil, v_prod_op, v_prod_gas,
                        n_y, n_c, n_j, n_g, n_ds,
                        rate_repo, rate_10tr, r_price_cur_purch,
-                       r_dum_cur_purch, em_index, dum01:dum12, vcor)
+                       r_dum_cur_purch, em_index)
 
+long_exog = exog %>% filter(year(date)==2019) %>%  pivot_longer(-date, names_to = 'series', values_to = 'value') %>% drop_na()
+mean_val_2019 = long_exog %>% as_tibble()%>% ungroup() %>% group_by(series) %>%summarize(mean_val = mean(value))
 endog = data %>% select(-c(brent, gas_lng, gas_europe, usd_eur,
                            v_prod_oil, v_prod_op, v_prod_gas,
                            n_y, n_c, n_j, n_g, n_ds,

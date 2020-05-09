@@ -14,7 +14,7 @@ library(lubridate)
 
 data_base = import('scenarios/all_vars_2020_base.xlsx') %>%
   mutate(date = yearmonth(date))
-data_good = import('data/all_vars_2020_best.xlsx') %>%
+data_best = import('data/all_vars_2020_best.xlsx') %>%
   mutate(date = yearmonth(date))
 data_bad= import('scenarios/all_vars_2020_bad.xlsx') %>%
   mutate(date = yearmonth(date))
@@ -99,26 +99,18 @@ exog_forecasts_naive = exog_forecasts %>% filter(.model == 'snaive') %>% as_tsib
 exog_full = full_join(exog_forecasts_naive, exog_tsb) #%>% filter(year(date) < 2021) %>% spread(series, value)
 
 # all variables in long format
-all_vars_tsb_base = data_base %>%
+all_vars_tsb = data %>%
   pivot_longer(-date, names_to = 'series', values_to = 'value') %>%
   drop_na() %>%
   as_tsibble(index = date, key = series)
 
-all_vars_tsb_best= data_best %>%
-  pivot_longer(-date, names_to = 'series', values_to = 'value') %>%
-  drop_na() %>%
-  as_tsibble(index = date, key = series)
+all_vars = full_join(all_vars_tsb, exog_full) %>%
+  filter(year(date)  <= 2020) %>% spread(series, value)
 
-all_vars_tsb_bad= data_bad %>%
-  pivot_longer(-date, names_to = 'series', values_to = 'value') %>%
-  drop_na() %>%
-  as_tsibble(index = date, key = series)
+all_vars = data_bad %>% spread(series, value)
 
-
-
-all_vars_base = all_vars_tsb_base %>% spread(series, value)
-all_vars_good = all_vars_tsb_best %>% spread(series, value)
-all_vars_bad = all_vars_tsb_bad %>% spread(series, value)
+all_vars = data_bad %>% spread(series, value)
+all_vars = data_bad %>% spread(series, value)
 
 #### сценарий!!!!
 #https://cbr.ru/Collection/Collection/File/27833/forecast_200424.pdf
@@ -135,94 +127,27 @@ all_vars3 = all_vars %>% mutate(brent = if_else(year(date) == 2020, 15, brent))
 #export(all_vars, 'data/all_vars_pred.csv')
 ### parameters from gensa
 
-par_model2 = par_model
-pred_2020_base = predict_bp(all_vars_base, par_model)
+all_vars
+pred_2020_base = predict_bp(all_vars, par_model)
 restored_data_2020_base = pred_2020_base[[1]]
 predictions_2020_base = pred_2020_base[[2]]
 
-pred_2020_bad = predict_bp(all_vars_bad, par_model)
-restored_data_2020_bad = pred_2020_bad[[1]]
-predictions_2020_bad = pred_2020_bad[[2]]
-
-pred_2020_good = predict_bp(all_vars_best, par_model)
-restored_data_2020_good = pred_2020_best[[1]]
-predictions_2020_good = pred_2020_best[[2]]
 
 
 
-cp = autoplot(ts.union(real_data = ts(all_vars_base$r_cur_purch, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_cur_purch, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_cur_purch, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_cur_purch, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Продажа/Покупка валюты в рамках бюджетного правила') + theme(legend.position = 'none')
 
 
 
-ru = autoplot(ts.union(real_data = ts(all_vars_base$rub_usd, start = c(2006, 1), freq = 12),
-                       base = ts(predictions_2020_best$hat_rub_usd_final, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_base$hat_rub_usd_final, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_bad$hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('рублей за доллар') + xlab('') + ggtitle('RUB/USD')
+autoplot(ts.union(real_data = ts(all_vars$r_cur_purch, start = c(2006, 1), freq = 12),
+                  model = ts(predictions$r_hat_cur_purch, start = c(2006, 1), freq = 12),
+                  base = ts(predictions_2021_base$r_hat_cur_purch, start = c(2006, 1), freq = 12),
+                  neg = ts(predictions_2021_neg$r_hat_cur_purch, start = c(2006, 1), freq = 12),
+                  good = ts(predictions_2021_good$r_hat_cur_purch, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('Currency purchase')
 
-ru
-ro = autoplot(ts.union(real_data = ts(all_vars_base$r_exp_oil, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_oil, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_oil, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_oil, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи нефти')
-
-rg = autoplot(ts.union(real_data = ts(all_vars_base$r_exp_gas, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_gas, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_gas, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_gas, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи газа') + theme(legend.position = 'none')
-
-rop = autoplot(ts.union(real_data = ts(all_vars_base$r_exp_op, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_op, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_op, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_op, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи нефтепродуктов') + theme(legend.position = 'none')
+predictions_2021_base$r_hat_cur_purch
 
 
-vo = autoplot(ts.union(real_data = ts(all_vars_base$v_exp_oil, start = c(2006, 1), freq = 12),
-                       base = ts(predictions_2020_base$v_hat_oil, start = c(2006, 1), freq = 12),
-                       bad = ts(predictions_2020_bad$v_hat_oil, start = c(2006, 1), freq = 12),
-                       good = ts(predictions_2020_best$v_hat_oil, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи нефти')
-vo
-vg = autoplot(ts.union(real_data = ts(all_vars_base$v_exp_gas, start = c(2006, 1), freq = 12),
-                       base = ts(predictions_2020_base$v_hat_gas, start = c(2006, 1), freq = 12),
-                       bad = ts(predictions_2020_bad$v_hat_gas, start = c(2006, 1), freq = 12),
-                       good = ts(predictions_2020_best$v_hat_gas, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи газа')
 
-vop = autoplot(ts.union(real_data = ts(all_vars_base$v_exp_op, start = c(2006, 1), freq = 12),
-                        base = ts(predictions_2020_base$v_hat_op, start = c(2006, 1), freq = 12),
-                        bad = ts(predictions_2020_bad$v_hat_op, start = c(2006, 1), freq = 12),
-                        good = ts(predictions_2020_best$v_hat_op, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи нефтепродуктов')
-
-
-err = autoplot(ts.union(real_data = ts(all_vars_base$r_errors, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_errors, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_errors, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Чистые пропуски и ошибки') + theme(legend.position = 'none')
-dif_res = autoplot(ts.union(real_data = ts(all_vars_base$r_dif_reserves, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_dif_res_short, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_dif_res_short, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Изменение резеров')
-
-bal_fin = autoplot(ts.union(real_data = ts(all_vars_base$r_bal_fin, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$hat_fin_bal, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$hat_fin_bal, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$hat_fin_bal, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Финансовый баланс') +  theme(legend.position = 'none')
-trade_bal = autoplot(ts.union(real_data = ts(all_vars_base$r_bal_trade, start = c(2006, 1), freq = 12),
-                            base = ts(predictions_2020_base$r_hat_bal_trade, start = c(2006, 1), freq = 12),
-                            bad = ts(predictions_2020_bad$r_hat_bal_trade, start = c(2006, 1), freq = 12),
-                            good = ts(predictions_2020_best$r_hat_bal_trade, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Торговый баланс')
-trade_bal
-cur_acc = autoplot(ts.union(real_data = ts(all_vars_base$r_cur_account, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_cur_acc, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_cur_acc, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_cur_acc, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + ggtitle('Счет текущих операций')
-
-library(patchwork)
-cur_acc/(err + bal_fin)
-
-ru/cp
-ro/(rop + rg)
 # rub_usd
 
 

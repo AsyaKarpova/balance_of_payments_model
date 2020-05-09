@@ -14,14 +14,11 @@ library(patchwork)
 
 all_vars = import('data/data_month1.xlsx') %>% mutate(date = yearmonth(date)) %>% as_tsibble()
 all_vars_quater = import('data/data_quarter_new.xlsx')
-quater_date = all_vars_quater$date
-all_vars_quater = select(all_vars_quater, -date)/1000
+all_vars_quater = mutate_at(all_vars_quater, vars(-date), ~ . / 1000)
 
-all_vars_quater = mutate(all_vars_quater, date = quater_date)
+all_vars = all_vars %>% filter(year(date) <= 2019)
 
-all_vars = all_vars %>% filter(year(date) <= 2020)
-
-par_model = import('script/par_model.Rds')
+par_model = import('script/gensa_par.Rds')
 par_model2 = import('script/par_model.Rds')
 
 source('script/functions.R')
@@ -32,33 +29,82 @@ all_vars = create_tibble(all_vars)
 # r_exp_serv, r_exp_all,r_imp_goods,r_imp_serv,r_imp_all and some r_bal_' from 2012Q1 (start from start_2012 index)
 
 ### parameters from gensa
-par_oil = par_model$par_oil
-par_gas = par_model$par_gas
-par_op = par_model$par_op
-par_othg = par_model$par_othg
-par_imp_gds = par_model$par_imp_gds
-par_imp_serv = par_model$par_imp_serv
-par_exp_serv = par_model$par_exp_serv
-par_bal_wage = par_model$par_bal_wage
-par_rent_sinc = par_model$par_rent_sinc
-par_inv = par_model$par_inv
-par_errors = par_model$par_errors
-par_difr_res = par_model$par_difr_res
-par_cur_purch = par_model2$par_cur_purch
-par_rub_usd = par_model$par_rub_usd
-
-
+par_oil = import('par_oil_2019.Rds')
+par_gas = import('par_gas_2019.Rds')
+par_op = import('par_op_2019.Rds')
+par_othg = import('par_othg_2019.Rds')
+par_imp = import('par_imp_2019.Rds')
+par_exp_serv = import('par_exp_serv_2019.Rds')
+par_bal_wage = import('par_bal_wage_2019.Rds')
+par_rent_sinc = import('par_rent_sinc.Rds')
+par_inv = import('par_inv_2019.Rds')
+par_errors = import('par_errors_2019.Rds')
+par_difr_res = import('par_dif_res_2019.Rds')
+par_cur_purch = import('par_cur_purch_2019.Rds')
+par_rub_usd = import('par_rub_usd_2019.Rds')
+par_model = list(par_oil = par_oil, par_gas = par_gas, par_op = par_op,
+                par_othg = par_othg, par_imp = par_imp, par_exp_serv = par_exp_serv,
+                par_bal_wage = par_bal_wage, par_rent_sinc = par_rent_sinc, par_inv = par_inv,
+                par_errors = par_errors, par_difr_res = par_difr_res, par_cur_purch = par_cur_purch,
+                par_rub_usd = par_rub_usd)
+export(par_model, 'par_model_2019.Rds')
 # dates
 end_2018 = 156
 end_2019 = 168
 end_2013 = 96
 end_2019q4 = 52
 start_2012 = 73
+all_vars
+
+restored_all = predict_bp(all_vars, par_model)
+predictions = restored_all[[2]]
+predictions$r_hat_cap_acc = rep(0, nrow(all_vars))
+a = autoplot(ts.union(real_data = ts(all_vars$r_cur_account[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$r_hat_cur_acc, start = c(2006, 1), freq = 12))) + ylab('млрд.долл') + xlab('') +  ggtitle('Счет текущих операций') + theme(legend.position = 'none')
+
+b = autoplot(ts.union(real_data = ts(all_vars$r_bal_fin[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$hat_fin_bal, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') +  ggtitle('Финансовый баланс')
+
+c = autoplot(ts.union(real_data = ts(all_vars$r_errors[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('млрд. долл') + xlab('') +  ggtitle('Чистые ошибки и пропуски')  +  theme(legend.position = 'none')
+
+d = autoplot(ts.union(real_data = ts(all_vars$r_cap_account[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$r_hat_cap_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') +  ggtitle('Счет операций с капиталом')
+
+er_plot = autoplot(ts.union(real_data = ts(all_vars$rub_usd[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$hat_rub_usd_final, start = c(2006, 1), freq = 12))) + xlab('') + ylab('рублей за доллар') +  ggtitle('RUB/USD')
+
+cur_p_plot = autoplot(ts.union(real_data = ts(all_vars$r_cur_purch[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$r_hat_cur_purch, start = c(2006, 1), freq = 12))) + xlab('') + ylab('млрд.долл') +  ggtitle('Покупка валюты Минфином') + theme(legend.position = 'none')
 
 
+bp_plot = (a+d)/(c+b)
+er_plot/cur_p_plot
 
+p_oil = autoplot(ts.union(real_data = ts(all_vars$p_exp_oil[1:end_2019], start = c(2006, 1), freq = 12),
+                  model = ts(predictions$p_hat_oil, start = c(2006, 1), freq = 12))) + xlab('') + ylab(parse(text = paste0('"долл./"',  '~ м^3'))) +  ggtitle('Средняя цена экспорта нефти') + theme(legend.position = 'none')
+v_oil = autoplot(ts.union(real_data = ts(all_vars$v_exp_oil[1:end_2019], start = c(2006, 1), freq = 12),
+                          model = ts(predictions$v_hat_oil, start = c(2006, 1), freq = 12))) + xlab('') + ylab(parse(text = paste0('"млрд."',  '~ м^3'))) +  ggtitle('Объем экспорта нефти') + theme(legend.position = 'none')
+r_oil = autoplot(ts.union(real_data = ts(all_vars$r_exp_oil[1:end_2019], start = c(2006, 1), freq = 12),
+                          model = ts(predictions$r_hat_oil, start = c(2006, 1), freq = 12))) + xlab('') + ylab('млрд. долл.') +  ggtitle('Выручка от экспорта нефти')
+r_oil/(v_oil + p_oil)
 
-# oil model
+p_op = autoplot(ts.union(real_data = ts(all_vars$p_exp_op[1:end_2019], start = c(2006, 1), freq = 12),
+                          model = ts(predictions$p_hat_op, start = c(2006, 1), freq = 12))) + xlab('') + ylab(parse(text = paste0('"долл./"',  '~ м^3'))) +  ggtitle('Средняя цена экспорта нефтепродуктов') + theme(legend.position = 'none')
+v_op = autoplot(ts.union(real_data = ts(all_vars$v_exp_op[1:end_2019], start = c(2006, 1), freq = 12),
+                          model = ts(predictions$v_hat_op, start = c(2006, 1), freq = 12))) + xlab('') + ylab(parse(text = paste0('"млрд."',  '~ м^3'))) +  ggtitle('Объем экспорта нефтепродуктов') + theme(legend.position = 'none')
+r_op = autoplot(ts.union(real_data = ts(all_vars$r_exp_op[1:end_2019], start = c(2006, 1), freq = 12),
+                          model = ts(predictions$r_hat_op, start = c(2006, 1), freq = 12))) + xlab('') + ylab('млрд. долл.') +  ggtitle('Выручка от экспорта нефтепродуктов')
+(r_op /(v_op + p_op)) + ggtitle('j')
+
+p_gas = autoplot(ts.union(real_data = ts(all_vars$p_exp_gas[1:end_2019], start = c(2006, 1), freq = 12),
+                         model = ts(predictions$p_hat_gas, start = c(2006, 1), freq = 12))) + xlab('') + ylab(parse(text = paste0('"долл./"',  '~ м^3'))) +  ggtitle('Средняя цена экспорта газа') + theme(legend.position = 'none')
+v_gas = autoplot(ts.union(real_data = ts(all_vars$v_exp_gas[1:end_2019], start = c(2006, 1), freq = 12),
+                         model = ts(predictions$v_hat_gas, start = c(2006, 1), freq = 12))) + xlab('') + ylab(parse(text = paste0('"млрд."',  '~ м^3'))) +  ggtitle('Объем экспорта газа') + theme(legend.position = 'none')
+r_gas = autoplot(ts.union(real_data = ts(all_vars$r_exp_gas[1:end_2019], start = c(2006, 1), freq = 12),
+                         model = ts(predictions$r_hat_gas, start = c(2006, 1), freq = 12))) + xlab('') + ylab('млрд. долл.') +  ggtitle('Выручка от экспорта газа')
+r_gas /(v_gas + p_gas)
+
 
 X_oil = all_vars %>%
   select(const, brent, brent_1, rub_usd_1)
@@ -71,7 +117,7 @@ R_oil_quarter = all_vars_quater %>%
 
 pred_oil = make_pred_oil(par_oil, X_oil, R_oil, end = end_2019)
 
-autoplot(ts.union(real_data = ts(all_vars$p_exp_oil[1:end_2019-1], start = c(2006, 1), freq = 12),
+autoplot(ts.union(real_data = ts(all_vars$p_exp_oil[1:end_2019], start = c(2006, 1), freq = 12),
                   model = ts(pred_oil$p_hat_oil, start = c(2006, 1), freq = 12))) + ylab('p_exp_oil') + xlab('') +  ggtitle('Average price of oil exported')
 #ggsave('oil_p.png')
 
@@ -129,7 +175,7 @@ autoplot(ts.union(real_data = ts(all_vars_quater$v_exp_op, start = c(2006, 1), f
 resid = all_vars$v_exp_op[(end_2013-12):end_2013] - pred_op$v_hat_op[(end_2013-12):end_2013]
 train = pred_op$v_hat_op[1:(end_2013-13)]
 a = MASE(.train = train, .resid = resid, .period=12)
-mape_v_hat_op = MASE(pred_op$v_hat_op[(end_2013-12):end_2013], all_vars$v_exp_op[(end_2013-12):end_2013])
+mape_v_hat_op = mase(pred_op$v_hat_op[(end_2013-12):end_2013], all_vars$v_exp_op[(end_2013-12):end_2013])
 mape_r_hat_op = mase(pred_op$r_hat_op[(end_2013-12):end_2013], all_vars$r_exp_op[(end_2013-12):end_2013])
 mape_p_hat_op = mase(pred_op$p_hat_op[(end_2013-12):end_2013], all_vars$p_exp_op[(end_2013-12):end_2013])
 mape_v_hat_op
@@ -179,8 +225,8 @@ mape_p_hat_gas = mase(pred_gas$p_hat_gas[(end_2013-12):end_2013], all_vars$p_exp
 
 X_othg = tibble(const = 1,
                 r_hat_oog = r_hat_gas + r_hat_oil + r_hat_op,
-                r_hat_oog_dum = r_hat_oog * all_vars$dum_1114[1:end_2019-1],
-                gpd_defl = lag(all_vars$n_y, 1)[1:end_2019-1] / all_vars$rub_usd_1[1:end_2019-1])
+                r_hat_oog_dum = r_hat_oog * all_vars$dum_1114[1:end_2019],
+                gpd_defl = lag(all_vars$n_y, 1)[1:end_2019] / all_vars$rub_usd_1[1:end_2019])
 
 X_othg %>%tail()
 
@@ -190,7 +236,7 @@ R_othg_quarter = all_vars_quater %>%
   select(r_exp_othg, r_exp_goods) %>% na.omit()
 
 pred_exp = make_pred_exp(par_othg, X_othg, R_othg, end = end_2019)
-pred_exp$r_hat_othg
+
 autoplot(ts.union(real_data = ts(all_vars$r_exp_othg[1:end_2013], start = c(2006, 1), freq = 12),
                   model = ts(pred_exp$r_hat_othg, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of other goods')
 #ggsave('exp_othg.png')
@@ -203,7 +249,6 @@ autoplot(ts.union(real_data = ts(all_vars$r_exp_goods[1:end_2019-1], start = c(2
 
 r_hat_othg = pred_exp$r_hat_othg
 r_hat_gds = pred_exp$r_hat_gds
-r_hat_gds
 
 mape_r_hat_othg = mase(r_hat_othg[(end_2013-12):end_2013], all_vars$r_exp_othg[(end_2013-12):end_2013])
 mape_r_hat_gds = mase(r_hat_gds[(end_2013-12):end_2013], all_vars$r_exp_goods[(end_2013-12):end_2013])
@@ -216,6 +261,9 @@ mape_r_hat_gds
 X_imp = tibble(consump_defl = lag(all_vars$n_c, 1)/all_vars$rub_usd_1,
                j_defl = lag(all_vars$n_j, 1)/all_vars$rub_usd_1,
                ds_defl = (all_vars$n_ds_1)/all_vars$rub_usd_1)
+
+
+
 X_imp%>% tail()
 X_imp = X_imp[1:end_2019,] %>%
   mutate(r_hat_gds = r_hat_gds)
@@ -247,9 +295,9 @@ autoplot(ts.union(real_data = ts(all_vars$r_imp_all, start = c(2006, 1), freq = 
 
 #ggsave('imp_all.png')
 
-r_hat_imp_gds = pred_imp$r_hat_imp_gds[1:end_2019-1]
-r_hat_imp_serv = pred_imp$r_hat_imp_serv[1:end_2019-1]
-r_hat_imp_all = pred_imp$r_imp_all[1:end_2019-1]
+r_hat_imp_gds = pred_imp$r_hat_imp_gds[1:end_2019]
+r_hat_imp_serv = pred_imp$r_hat_imp_serv[1:end_2019]
+r_hat_imp_all = pred_imp$r_imp_all[1:end_2019]
 
 
 mape_r_hat_imp_gds = mase(r_hat_imp_gds[(end_2019-12):end_2019-1], all_vars$r_imp_goods[(end_2019-12):end_2019-1])
@@ -392,10 +440,8 @@ autoplot(ts.union(real_data = ts(all_vars$r_bal_wage, start = c(2006, 1), freq =
 #ggsave('bwages.png')
 r_hat_wage = pred_wage$r_hat
 
-mape_r_hat_wage = mase(r_hat_wage[(end_2019-12):end_2019-1], all_vars$r_bal_wage[(end_2019-12):end_2019-1])
-mase(r_hat_wage[(end_2019-12):end_2019-1], all_vars$r_bal_wage[(end_2019-12):end_2019-1])
-smase(r_hat_wage[(end_2019-12):end_2019-1], all_vars$r_bal_wage[(end_2019-12):end_2019-1])
-mape_r_hat_wage
+mape_r_hat_wage = mase(r_hat_wage[(end_2019-12):end_2019], all_vars$r_bal_wage[(end_2019-12):end_2019-1])
+mase(r_hat_wage[(end_2019-12):end_2019], all_vars$r_bal_wage[(end_2019-12):end_2019-1])
 
 
 ### model for erros
@@ -422,17 +468,17 @@ errors
 
 mape_r_hat_errors = mase(r_hat_errors[(end_2019-12):end_2019-1], all_vars$r_errors[(end_2019-12):end_2019-1])
 mase(r_hat_errors[(end_2019-12):end_2019-1], all_vars$r_errors[(end_2019-12):end_2019-1])
-smase(r_hat_errors[(end_2019-12):end_2019-1], all_vars$r_errors[(end_2019-12):end_2019-1])
+
 cur_acc = autoplot(ts.union(real_data = ts(all_vars$r_cur_account, start = c(2006, 1), freq = 12),
-                  model = ts(r_hat_cur_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Счет текущих операций')
+                  model = ts(r_hat_cur_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Счет текущих операций, млрд. долл') + theme(legend.position = 'none')
 mape_r_hat_errors
 ### models for difference of reserves
 r_hat_cur_acc = r_hat_inv + r_hat_rent_sinc + r_hat_bal_serv + r_hat_bal_trade + r_hat_wage
 mape_r_hat_cur_acc = mase(r_hat_cur_acc[(end_2019-12):end_2019-1], all_vars$r_cur_account[(end_2019-12):end_2019-1])
 r_hat_cap_acc = rep(0, nrow(all_vars))
-cap_acc = autoplot(ts.union(real_data = ts(all_vars$r_cap_account, start = c(2006, 1), freq = 12),
-                  model = ts(r_hat_cap_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Счет операций с капиталом, млрд. долл.') + theme(legend.position = 'none')
-
+cap_acc = autoplot(ts.union(факт = ts(all_vars$r_cap_account, start = c(2006, 1), freq = 12),
+                  модель = ts(r_hat_cap_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Счет операций с капиталом, млрд. долл.')
+cap_acc
 X_difr = tibble(const = 1,
                 dif_brent = all_vars$dif_brent,
                 dif_brent_cor = (all_vars$dif_brent * all_vars$vcor)/(all_vars$rub_usd_1),
@@ -460,7 +506,7 @@ r_hat_dif_res_short_quarter = pred_res$r_hat_dif_res_short_quarter
 
 dif_res = autoplot(ts.union(real_data = ts(all_vars$r_dif_reserves, start = c(2006, 1), freq = 12),
                   model = ts(r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('change') + xlab('') + ggtitle('Difference of reserves')
-
+dif_res
 #ggsave('dif_res.png')
 
 mape_r_hat_dif_res = mase(r_hat_dif_res_short[(end_2019-12):(end_2019-1)], all_vars$r_dif_reserves[(end_2019-12):(end_2019-1)])
@@ -536,15 +582,19 @@ pred_rub_usd = make_pred_rub_usd(par_rub_usd, X_rub_usd,R_rub_usd, mask=mask)
 hat_rub_usd_final = pred_rub_usd$hat_rub_usd_final
 
 
+
 autoplot(ts.union(real_data = ts(all_vars$rub_usd, start = c(2006, 1), freq = 12),
                   model = ts(hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('exchange rate') + xlab('') + ggtitle('Exchange rate (rub/usd)')
 
 
+predictions = all_vars%>%select(r_bal_wage, rub_usd) %>%mutate(hat_rub_usd = hat_rub_usd_final,
+                                                 hat_bal_wage = r_hat_wage) %>% filter(year(date)>=2018)
+export(predictions, 'wage_ru.xlsx')
 mape_rub_usd = mase(hat_rub_usd_final[(end_2019-12):end_2019-1], all_vars$rub_usd[(end_2019-12):end_2019-1])
 #ggsave('rub_usd.png')
 hat_fin_bal = r_hat_errors + r_hat_cur_acc - r_hat_dif_res_short
 mape_hat_fin_bal = mase(hat_fin_bal[(end_2019-12):end_2019-1], all_vars$r_bal_fin[(end_2019-12):end_2019-1])
-#mape_table = tibble(r_bal_wage = mape_r_hat_wage, r_cur_purch = mape_cur_purch,
+mape_table = tibble(r_bal_wage = mape_r_hat_wage, r_cur_purch = mape_cur_purch,
               p_exp_gas = mape_p_hat_gas,
               p_exp_oil = mape_p_hat_oil, p_exp_op = mape_p_hat_op, r_dif_reserves = mape_r_hat_dif_res,
               r_errors = mape_r_hat_errors, r_exp_serv = mape_r_hat_exp_serv, r_exp_gas = mape_r_hat_gas, r_exp_goods = mape_r_hat_gds,
@@ -556,9 +606,32 @@ mape_hat_fin_bal = mase(hat_fin_bal[(end_2019-12):end_2019-1], all_vars$r_bal_fi
               r_bal_serv = mape_r_hat_bal_serv,
               r_exp_all = mape_r_hat_exp_all)
 
-#mape_tabl_long = pivot_longer(mape_table, cols = "r_bal_wage":"r_exp_all", names_to = 'series', values_to = 'mase')
-#export(mape_tabl_long, 'mase_table_pse1.Rds')
+mase_our = import('mase_table_pse2.Rds')
+mase_our$.model = 'bp_model'
+mase_b = import('mase_bench.Rds')
+
+all_metrics = bind_rows(mase_our, mase_b) %>% select(series, mase, `.model`)
+all_metr = all_metrics %>% spread( key = '.model', value = 'mase') %>% filter(series != 'aq_assets', series != 'aq_obl', series!= 'r_bal_sinc', series != 'r_bal_rent', series != 'r_cap_account')
+all_metr = all_metr %>% select(series, bp_model, arima, ets, snaive)
+library(xtable)
+all_metr %>% View()
+a = xtable(all_metr[1:5], caption = 'MASE')
+b = printbold(a, each = 'row')
+print(a, include.rownames=FALSE)
+
+mape_tabl_long = pivot_longer(mape_table, cols = "r_bal_wage":"r_exp_all", names_to = 'series', values_to = 'mase')
+export(mape_tabl_long, 'mase_table_pse2.Rds')
 #mape_tabl_long %>%View()
 
-(cur_acc + cap_acc) /(bal_fin + errors)
+cur_acc = autoplot(ts.union(real_data = ts(all_vars$r_cur_account, start = c(2006, 1), freq = 12),
+                            model = ts(r_hat_cur_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Счет текущих операций, млрд. долл') + theme(legend.position = 'none')
 
+cap_acc = autoplot(ts.union(факт = ts(all_vars$r_cap_account, start = c(2006, 1), freq = 12),
+                                модель = ts(r_hat_cap_acc, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Счет операций с капиталом, млрд. долл.')
+
+library(tikzDevice)
+
+tikz('myPlot.tex')
+bp = (cur_acc + cap_acc) /(bal_fin + errors)
+ggsave('bp.png')
+dev.off()
