@@ -1,0 +1,15 @@
+[0] Config.pm:302> INFO - This is Biber 2.11
+[0] Config.pm:305> INFO - Logfile is 'vkr.blg'
+[57] biber-MSWIN32:313> INFO - === 
+[152] Biber.pm:371> INFO - Reading 'vkr.bcf'
+[276] Biber.pm:857> INFO - Found 16 citekeys in bib section 0
+[296] Biber.pm:3976> INFO - Processing section 0
+[337] Biber.pm:4136> INFO - Looking for bibtex format file 'document.bib' for section 0
+[353] bibtex.pm:1500> INFO - LaTeX decoding ...
+[395] bibtex.pm:1316> INFO - Found BibTeX data source 'document.bib'
+[533] UCollate.pm:68> INFO - Overriding locale 'ru-RU' defaults 'normalization = NFD' with 'normalization = prenormalized'
+[533] UCollate.pm:68> INFO - Overriding locale 'ru-RU' defaults 'variable = shifted' with 'variable = non-ignorable'
+[533] Biber.pm:3804> INFO - Sorting list 'nty/global//global/global' of type 'entry' with template 'nty' and locale 'ru-RU'
+[533] Biber.pm:3810> INFO - No sort tailoring available for locale 'ru-RU'
+[556] bbl.pm:617> INFO - Writing 'vkr.bbl' with encoding 'UTF-8'
+[563] bbl.pm:720> INFO - Output to vkr.bbl

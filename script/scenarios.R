@@ -14,7 +14,7 @@ library(lubridate)
 
 data_base = import('scenarios/all_vars_2020_base.xlsx') %>%
   mutate(date = yearmonth(date))
-data_good = import('data/all_vars_2020_best.xlsx') %>%
+data_best = import('data/all_vars_2020_best.xlsx') %>%
   mutate(date = yearmonth(date))
 data_bad= import('scenarios/all_vars_2020_bad.xlsx') %>%
   mutate(date = yearmonth(date))
@@ -123,15 +123,12 @@ all_vars_bad = all_vars_tsb_bad %>% spread(series, value)
 #### сценарий!!!!
 #https://cbr.ru/Collection/Collection/File/27833/forecast_200424.pdf
 # BRENT - 27, 35, 45
-all_vars1 = all_vars %>% mutate(brent = if_else(year(date) == 2020, 27, brent))
+
 
 #all_vars = all_vars %>% mutate(r_price_cur_purch = ifelse(r_dum_cur_purch == 0, 0, r_price_cur_purch))
 
 
-``````````
-all_vars2 = all_vars %>% mutate(brent = if_else(year(date) == 2020, 35, brent))
 
-all_vars3 = all_vars %>% mutate(brent = if_else(year(date) == 2020, 15, brent))
 #export(all_vars, 'data/all_vars_pred.csv')
 ### parameters from gensa
 
@@ -144,207 +141,209 @@ pred_2020_bad = predict_bp(all_vars_bad, par_model)
 restored_data_2020_bad = pred_2020_bad[[1]]
 predictions_2020_bad = pred_2020_bad[[2]]
 
-pred_2020_good = predict_bp(all_vars_best, par_model)
-restored_data_2020_good = pred_2020_best[[1]]
-predictions_2020_good = pred_2020_best[[2]]
+pred_2020_good = predict_bp(all_vars_good, par_model)
+restored_data_2020_good = pred_2020_good[[1]]
+predictions_2020_best= pred_2020_good[[2]]
 
 
 
-cp = autoplot(ts.union(real_data = ts(all_vars_base$r_cur_purch, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_cur_purch, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_cur_purch, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_cur_purch, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Продажа/Покупка валюты в рамках бюджетного правила') + theme(legend.position = 'none')
+cp = autoplot(ts.union(real_data = window(ts(all_vars_base$r_bal_trade, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_bal_trade, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_bal_trade, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_bal_trade, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('млрд.долл.') + xlab('') + ggtitle('Торговый баланс') + theme(legend.position = 'none')
 
+cp
 
-
-ru = autoplot(ts.union(real_data = ts(all_vars_base$rub_usd, start = c(2006, 1), freq = 12),
-                       base = ts(predictions_2020_best$hat_rub_usd_final, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_base$hat_rub_usd_final, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_bad$hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('рублей за доллар') + xlab('') + ggtitle('RUB/USD')
+ru = autoplot(ts.union(real_data = window(ts(all_vars_base$rub_usd, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       base = window(ts(predictions_2020_best$hat_rub_usd_final, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_base$hat_rub_usd_final, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_bad$hat_rub_usd_final, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('рублей за доллар') + xlab('') + ggtitle('RUB/USD')
 
 ru
-ro = autoplot(ts.union(real_data = ts(all_vars_base$r_exp_oil, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_oil, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_oil, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_oil, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи нефти')
+ro = autoplot(ts.union(real_data = window(ts(all_vars_base$r_exp_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_oil, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи нефти')
+ro
+rg = autoplot(ts.union(real_data = window(ts(all_vars_base$r_exp_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_gas, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи газа') + theme(legend.position = 'none')
+rg
+rop = autoplot(ts.union(real_data = window(ts(all_vars_base$_exp_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_op, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи нефтепродуктов') + theme(legend.position = 'none')
 
-rg = autoplot(ts.union(real_data = ts(all_vars_base$r_exp_gas, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_gas, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_gas, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_gas, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи газа') + theme(legend.position = 'none')
 
-rop = autoplot(ts.union(real_data = ts(all_vars_base$r_exp_op, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_op, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_op, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_op, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Выручка от продажи нефтепродуктов') + theme(legend.position = 'none')
-
-
-vo = autoplot(ts.union(real_data = ts(all_vars_base$v_exp_oil, start = c(2006, 1), freq = 12),
-                       base = ts(predictions_2020_base$v_hat_oil, start = c(2006, 1), freq = 12),
-                       bad = ts(predictions_2020_bad$v_hat_oil, start = c(2006, 1), freq = 12),
-                       good = ts(predictions_2020_best$v_hat_oil, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи нефти')
+vo = autoplot(ts.union(real_data = window(ts(all_vars_base$v_exp_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       base = window(ts(predictions_2020_base$v_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       bad = window(ts(predictions_2020_bad$v_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       good = window(ts(predictions_2020_best$v_hat_oil, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи нефти')
 vo
-vg = autoplot(ts.union(real_data = ts(all_vars_base$v_exp_gas, start = c(2006, 1), freq = 12),
-                       base = ts(predictions_2020_base$v_hat_gas, start = c(2006, 1), freq = 12),
-                       bad = ts(predictions_2020_bad$v_hat_gas, start = c(2006, 1), freq = 12),
-                       good = ts(predictions_2020_best$v_hat_gas, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи газа')
+vg = autoplot(ts.union(real_data = window(ts(all_vars_base$v_exp_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       base = window(ts(predictions_2020_base$v_hat_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       bad = window(ts(predictions_2020_bad$v_hat_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                       good = window(ts(predictions_2020_best$v_hat_gas, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи газа')
 
-vop = autoplot(ts.union(real_data = ts(all_vars_base$v_exp_op, start = c(2006, 1), freq = 12),
-                        base = ts(predictions_2020_base$v_hat_op, start = c(2006, 1), freq = 12),
-                        bad = ts(predictions_2020_bad$v_hat_op, start = c(2006, 1), freq = 12),
-                        good = ts(predictions_2020_best$v_hat_op, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи нефтепродуктов')
+vg
+vop = autoplot(ts.union(real_data = window(ts(all_vars_base$v_exp_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                        base = window(ts(predictions_2020_base$v_hat_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                        bad = window(ts(predictions_2020_bad$v_hat_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                        good = window(ts(predictions_2020_best$v_hat_op, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('млрд.долл.') + xlab('') + ggtitle('Объем продажи нефтепродуктов')
 
+vop
+err = autoplot(ts.union(real_data = window(ts(all_vars_base$r_errors, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_errors, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_errors, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_errors, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('млрд.долл.') + xlab('') + ggtitle('Чистые пропуски и ошибки') + theme(legend.position = 'none')
+err
+dif_res = autoplot(ts.union(real_data = window(ts(all_vars_base$r_dif_reserves, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_dif_res_short, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_dif_res_short, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_dif_res_short, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('млрд.долл.') + xlab('') + ggtitle('Изменение резеров')
 
-err = autoplot(ts.union(real_data = ts(all_vars_base$r_errors, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_errors, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_errors, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Чистые пропуски и ошибки') + theme(legend.position = 'none')
-dif_res = autoplot(ts.union(real_data = ts(all_vars_base$r_dif_reserves, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_dif_res_short, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_dif_res_short, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + xlab('') + ggtitle('Изменение резеров')
-
-bal_fin = autoplot(ts.union(real_data = ts(all_vars_base$r_bal_fin, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$hat_fin_bal, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$hat_fin_bal, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$hat_fin_bal, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Финансовый баланс') +  theme(legend.position = 'none')
-trade_bal = autoplot(ts.union(real_data = ts(all_vars_base$r_bal_trade, start = c(2006, 1), freq = 12),
-                            base = ts(predictions_2020_base$r_hat_bal_trade, start = c(2006, 1), freq = 12),
-                            bad = ts(predictions_2020_bad$r_hat_bal_trade, start = c(2006, 1), freq = 12),
-                            good = ts(predictions_2020_best$r_hat_bal_trade, start = c(2006, 1), freq = 12))) + ylab('') + xlab('') + ggtitle('Торговый баланс')
+bal_fin = autoplot(ts.union(real_data = window(ts(all_vars_base$r_bal_fin, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$hat_fin_bal, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$hat_fin_bal, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$hat_fin_bal, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('млрд.долл.') + xlab('') + ggtitle('Финансовый баланс')+   theme(legend.position = 'none')
+trade_bal = autoplot(ts.union(real_data = window(ts(all_vars_base$r_bal_trade, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                            base = window(ts(predictions_2020_base$r_hat_bal_trade, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                            bad = window(ts(predictions_2020_bad$r_hat_bal_trade, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                            good = window(ts(predictions_2020_best$r_hat_bal_trade, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('') + xlab('') + ggtitle('Торговый баланс')
 trade_bal
-cur_acc = autoplot(ts.union(real_data = ts(all_vars_base$r_cur_account, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2020_base$r_hat_cur_acc, start = c(2006, 1), freq = 12),
-                  bad = ts(predictions_2020_bad$r_hat_cur_acc, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2020_best$r_hat_cur_acc, start = c(2006, 1), freq = 12))) + ylab('млрд.долл.') + ggtitle('Счет текущих операций')
+cur_acc = autoplot(ts.union(real_data = window(ts(all_vars_base$r_cur_account, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2020_base$r_hat_cur_acc, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  bad = window(ts(predictions_2020_bad$r_hat_cur_acc, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2020_best$r_hat_cur_acc, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('млрд.долл.') + xlab('') + ggtitle('Счет текущих операций')
 
 library(patchwork)
-cur_acc/(err + bal_fin)
+cur_acc/cp
 
 ru/cp
-ro/(rop + rg)
+ro/rgб
 # rub_usd
 
 
-autoplot(ts.union(real_data = ts(all_vars$rub_usd, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$hat_rub_usd_final, start = c(2006, 1), freq = 12))) + ylab('exchange rate') + xlab('') + ggtitle('Exchange rate (rub/usd)')
+autoplot(ts.union(real_data = window(ts(all_vars$rub_usd, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$hat_rub_usd_final, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('exchange rate') + xlab('') + ggtitle('Exchange rate (rub/usd)')
 
 
 
 
-autoplot(ts.union(real_data = ts(all_vars$p_exp_oil, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$p_hat_oil, start = c(2006, 1), freq = 12))) + ylab('p_exp_oil') + xlab('') +  ggtitle('Average price of oil exported')
+autoplot(ts.union(real_data = window(ts(all_vars$p_exp_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$p_hat_oil, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('p_exp_oil') + xlab('') +  ggtitle('Average price of oil exported')
 #ggsave('oil_p.png')
 
-autoplot(ts.union(real_data = ts(all_vars$v_exp_oil, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$v_hat_oil, start = c(2006, 1), freq = 12))) + ylab('v_exp_oil') + xlab('') + ggtitle('Average volume of oil exported')
+autoplot(ts.union(real_data = window(ts(all_vars$v_exp_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$v_hat_oil, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('v_exp_oil') + xlab('') + ggtitle('Average volume of oil exported')
 #ggsave('oil_v.png')
-autoplot(ts.union(real_data = ts(all_vars$r_exp_oil, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_oil, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2021_base$r_hat_oil, start = c(2006, 1), freq = 12),
-                  neg = ts(predictions_2021_neg$r_hat_oil, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2021_good$r_hat_oil, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2021_base$r_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  neg = window(ts(predictions_2021_neg$r_hat_oil, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2021_good$r_hat_oil, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Average revenue from export of oil')
 
 
 #ggsave('oil_r.png')
 
 
-autoplot(ts.union(real_data = ts(all_vars$p_exp_op, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$p_hat_op, start = c(2006, 1), freq = 12))) + ylab('p_exp_op')  + xlab('') + ggtitle('Average price of oil products exported')
+autoplot(ts.union(real_data = window(ts(all_vars$p_exp_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$p_hat_op, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('p_exp_op')  + xlab('') + ggtitle('Average price of oil products exported')
 ##ggsave('op_p.png')
 
-autoplot(ts.union(real_data = ts(all_vars$v_exp_op, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$v_hat_op, start = c(2006, 1), freq = 12))) + ylab('v_exp_op') + xlab('') + ggtitle('Average volume of oil products exported')
+autoplot(ts.union(real_data = window(ts(all_vars$v_exp_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$v_hat_op, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('v_exp_op') + xlab('') + ggtitle('Average volume of oil products exported')
 
 #ggsave('op_v.png')
-autoplot(ts.union(real_data = ts(all_vars$r_exp_op, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_op, start = c(2006, 1), freq = 12))) + ylab('r_exp_op') + xlab('') + ggtitle('Average revenue from export of oil products')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_op, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_op, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('r_exp_op') + xlab('') + ggtitle('Average revenue from export of oil products')
 
 #ggsave('op_r.png')
 
 
 
 
-autoplot(ts.union(real_data = ts(all_vars$p_exp_gas, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$p_hat_gas, start = c(2006, 1), freq = 12))) + ylab('p_exp_gas') + xlab('') + ggtitle('Average price of gas exported')
+autoplot(ts.union(real_data = window(ts(all_vars$p_exp_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$p_hat_gas, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('p_exp_gas') + xlab('') + ggtitle('Average price of gas exported')
 #ggsave('gas_p.png')
 
-autoplot(ts.union(real_data = ts(all_vars$v_exp_gas, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$v_hat_gas, start = c(2006, 1), freq = 12))) + ylab('v_exp_gas') + xlab('') + ggtitle('Average volume of gas exported')
+autoplot(ts.union(real_data = window(ts(all_vars$v_exp_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$v_hat_gas, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('v_exp_gas') + xlab('') + ggtitle('Average volume of gas exported')
 #ggsave('gas_v.png')
 
-autoplot(ts.union(real_data = ts(all_vars$r_exp_gas, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_gas, start = c(2006, 1), freq = 12))) + ylab('r_exp_gas')  + xlab('') + ggtitle('Average revenue from export of gas')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_gas, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_gas, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('r_exp_gas')  + xlab('') + ggtitle('Average revenue from export of gas')
 #ggsave('gas_r.png')
 
 
 ### optimisation for export other goods model
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_exp_othg, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_othg, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of other goods')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_othg, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_othg, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of other goods')
 #ggsave('exp_othg.png')
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_exp_goods, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_gds, start = c(2006, 1), freq = 12),
-                  base = ts(predictions_2021_base$r_hat_gds, start = c(2006, 1), freq = 12),
-                  neg = ts(predictions_2021_neg$r_hat_gds, start = c(2006, 1), freq = 12),
-                  good = ts(predictions_2021_good$r_hat_gds, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of all goods')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_goods, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_gds, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  base = window(ts(predictions_2021_base$r_hat_gds, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  neg = window(ts(predictions_2021_neg$r_hat_gds, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  good = window(ts(predictions_2021_good$r_hat_gds, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of all goods')
 
 #ggsave('exp_all.png')
 
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_imp_goods, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_imp_gds, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from import of goods')
+autoplot(ts.union(real_data = window(ts(all_vars$r_imp_goods, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_imp_gds, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Revenue from import of goods')
 
 #ggsave('imp_goods.png')
 
-autoplot(ts.union(real_data = ts(all_vars$r_imp_serv, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_imp_serv, start = c(2006, 1), freq = 12))) + ggtitle('Average revenue from import of services') + ylab('revenue') + xlab('')
+autoplot(ts.union(real_data = window(ts(all_vars$r_imp_serv, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_imp_serv, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ggtitle('Average revenue from import of services') + ylab('revenue') + xlab('')
 
 #ggsave('imp_services.png')
 
-autoplot(ts.union(real_data = ts(all_vars$r_imp_all, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_imp_all , start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from import')
+autoplot(ts.union(real_data = window(ts(all_vars$r_imp_all, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_imp_all , start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Revenue from import')
 
 #ggsave('imp_all.png')
 
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_exp_serv, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_exp_serv, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of services')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_serv, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_exp_serv, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of services')
 
 #ggsave('exp_serv.png')
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_exp_all, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_exp_all, start = c(2006, 1), freq = 12))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of goods and services')
+autoplot(ts.union(real_data = window(ts(all_vars$r_exp_all, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_exp_all, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('revenue') + xlab('') + ggtitle('Revenue from export of goods and services')
 
 #ggsave('exp_gs.png')
 
 
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_bal_rent + all_vars$r_bal_sinc, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_rent_sinc, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('Balance of rent and secondary income')
+autoplot(ts.union(real_data = window(ts(all_vars$r_bal_rent + all_vars$r_bal_sinc, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_rent_sinc, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('value') + xlab('') + ggtitle('Balance of rent and secondary income')
 
 #ggsave('rent_sink.png')
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_bal_inv, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_inv, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('Balance of investment income')
+autoplot(ts.union(real_data = window(ts(all_vars$r_bal_inv, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_inv, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('value') + xlab('') + ggtitle('Balance of investment income')
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_bal_wage, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_wage, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('Balance of wages')
+autoplot(ts.union(real_data = window(ts(all_vars$r_bal_wage, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_wage, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('value') + xlab('') + ggtitle('Balance of wages')
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_errors, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_errors, start = c(2006, 1), freq = 12))) + ylab('value') + xlab('') + ggtitle('net errors and omissions')
+autoplot(ts.union(real_data = window(ts(all_vars$r_errors, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_errors, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('value') + xlab('') + ggtitle('net errors and omissions')
 
 
-autoplot(ts.union(real_data = ts(all_vars$r_dif_reserves, start = c(2006, 1), freq = 12),
-                  model = ts(predictions$r_hat_dif_res_short, start = c(2006, 1), freq = 12))) + ylab('change') + xlab('') + ggtitle('Difference of reserves')
+autoplot(ts.union(real_data = window(ts(all_vars$r_dif_reserves, start = c(2006, 1), freq = 12), start = c(2015, 1)),
+                  model = window(ts(predictions$r_hat_dif_res_short, start = c(2006, 1), freq = 12),start = c(2015, 1)))) + ylab('change') + xlab('') + ggtitle('Difference of reserves')
 

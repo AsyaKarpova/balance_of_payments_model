@@ -407,7 +407,11 @@ predict_bp = function(data, par_model){
   r_hat_oil = pred_oil$r_hat_oil
   v_hat_oil = pred_oil$v_hat_oil
   p_hat_oil = pred_oil$p_hat_oil
+  r_hat_oil_quarter = pred_oil$r_hat_oil_quarter
 
+  print(pred_oil)
+  v_hat_oil_quarter = pred_oil$v_hat_oil_quarter
+  p_hat_oil_quarter = pred_oil$p_hat_oil_quarter
 
   all_vars = prolonge_data(all_vars, 'r_exp_oil', r_hat_oil)
   all_vars = prolonge_data(all_vars, 'v_exp_oil', v_hat_oil)
@@ -433,6 +437,14 @@ predict_bp = function(data, par_model){
   p_hat_op = pred_op$p_hat_op
 
 
+
+  r_hat_op_quarter = pred_op$r_hat_op_quarter
+  v_hat_op_quarter = pred_op$v_hat_op_quarter
+  p_hat_op_quarter = pred_op$p_hat_op_quarter
+
+
+
+
   all_vars = prolonge_data(all_vars, 'r_exp_op', r_hat_op)
   all_vars = prolonge_data(all_vars, 'v_exp_op', v_hat_op)
   all_vars = prolonge_data(all_vars, 'p_exp_op', p_hat_op)
@@ -456,6 +468,9 @@ predict_bp = function(data, par_model){
   r_hat_gas = pred_gas$r_hat_gas
   v_hat_gas = pred_gas$v_hat_gas
   p_hat_gas = pred_gas$p_hat_gas
+  r_hat_gas_quarter = pred_gas$r_hat_gas_quarter
+  v_hat_gas_quarter = pred_gas$v_hat_gas_quarter
+  p_hat_gas_quarter = pred_gas$p_hat_gas_quarter
 
 
   all_vars = prolonge_data(all_vars, 'r_exp_gas', r_hat_gas)
@@ -658,7 +673,12 @@ predict_bp = function(data, par_model){
                      r_hat_othg = r_hat_othg, r_hat_gds = r_hat_gds,
                      r_hat_cur_acc = r_hat_cur_acc,
                      hat_fin_bal = hat_fin_bal)
-  return(list(restored_data = all_vars, predictions = predictions))
+  predictions_quarter = list(r_hat_dif_res_short = r_hat_dif_res_short_quarter,
+                     v_hat_gas = v_hat_gas_quarter,v_hat_oil = v_hat_oil_quarter,v_hat_op = v_hat_op_quarter,
+                     p_hat_gas = p_hat_gas_quarter, p_hat_op = p_hat_op_quarter, p_hat_oil = p_hat_oil_quarter,
+                     r_hat_oil = r_hat_oil_quarter, r_hat_op = r_hat_op_quarter, r_hat_gas = r_hat_gas_quarter)
+  return(list(restored_data = all_vars, predictions = predictions,
+              predictions_quarter = predictions_quarter))
 }
 
 #### optimisation

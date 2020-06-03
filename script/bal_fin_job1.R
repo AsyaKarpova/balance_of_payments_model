@@ -13,27 +13,29 @@ library(tsibble)
 library(fable)
 library(lubridate)
 library(skimr)
+library(dtw)
 
 # all data until the end of 2019
 # montly data on balance of finance start with 2012
+all_vars = import('data/data_month1.xlsx') %>%
+  mutate(date = yearmonth(date)) %>% as_tsibble() #select(-c(dum_1114:dum12), -c(n_c:n_y), -c(v_exp_gas:v_prod_op),
+                                            #-r_exp_oil, -r_exp_op, -r_exp_gas, -c(p_exp_gas:p_exp_op))%>%
 
-all_vars = import('data/all_vars_pred.csv') %>%
-  mutate(date = yearmonth(date)) %>%
-  as_tsibble()
-export(all_vars, 'data/all_vars_scenarios.xlsx')
+
 all_vars = all_vars %>% mutate(em_index_ratio = em_index / lag(em_index, 1))
 all_vars = all_vars %>% filter(year(date) > 2011, year(date) < 2020)
 source('script/functions.R')
-all_vars %>% tail()
+#all_vars = all_vars %>%na.omit()
+
 
 all_vars_quater = import('data/data_quarter_new.xlsx')
 all_vars_quater = mutate_at(all_vars_quater, vars(-date), ~ . / 1000)
+
 all_vars_quater = mutate(all_vars_quater, date = yearquarter(date)) %>%
   as_tsibble() %>% filter(year(date) > 2011)
 
 ## март 2013 - большие значений aq_obl и aq_assets
-autoplot(all_vars, dif_usd_eur_ratio) + ylab('aq_obl')  + xlab('') + ggtitle('Принятие обязательств')
-autoplot(all_vars, ) +  ylab('aq_assets')  + xlab('') + ggtitle('Покупка активов')
+
 
 cors = cor(all_vars$aq_assets, select(as_tibble(all_vars), -date, -dum01:-dum12), use = 'complete.obs') %>%
   as.data.frame(row.names = 'val') %>% abs()
@@ -48,20 +50,28 @@ names(high_cor_assets)
 
 is_high_obl = (cors_obl > 0.3) %>% as.data.frame
 high_cor_obl = which(unlist(transpose(is_high_obl)))
-names(high_cor_obl)
 
-
-
+all_vars = create_tibble(all_vars)
+all_vars$aq_assets
+all_vars$r_cur_purch
 X_aq_assets = tibble(const = 1,
                      r_cur_account = all_vars$r_cur_account,
-                     rate_repo = all_vars$rate_repo,
+                     rate_repo = all_vars$rate_repo/all_vars$rate_10tr,
                      rub_usd = all_vars$rub_usd,
+                     cur_purch = all_vars$r_cur_purch,
+                     rub_usd_var = all_vars$vcor*rub_usd/lag(rub_usd, 1),
                      em_index_ratio = all_vars$em_index_ratio,
-                     dif_usd_eur_ratio = all_vars$dif_usd_eur_ratio)
-X_aq_assets$em_index_ratio
+                     dif_usd_eur_ratio = all_vars$dif_usd_eur_ratio,
+                     dum_1114 = all_vars$dum_1114)
 
-X_aq_assets_dum = bind_cols(X_aq_assets, select(all_vars, dum01:dum11))
 
+
+all_vars = mutate(all_vars, rub_usd_var = all_vars$vcor*all_vars$rub_usd/lag(rub_usd, 1))
+names(all_vars)
+all_vars %>% select(aq_assets,aq_obl) %>%
+  pivot_longer(cols = c("aq_assets", "aq_obl")) %>%
+  as_tsibble(index=date, key=name) %>%
+  autoplot(value)
 
 R_assets = all_vars %>%
   select(aq_assets) %>%
@@ -74,32 +84,30 @@ R_assets_quarter = all_vars_quater %>%
 
 
 X = X_aq_assets
-X %>% tail()
-par = rep(0.6, 17)
+R = R_assets
+par = rep(0.6,21)
 par_0 = par
+nrow(X)
 make_pred_assets = function(par, X){
-  dummies = rep(c(par[7:10], 1, par[11:17]), nrow(X)/12)
-  coef = as.matrix(X) %*% par[1:6]
-  hat_aq_assets = as.vector(coef * dummies)
-  #hat_aq_assets = fill_recursive(add_term = add_term, coefs = par[16])
+  dummies = rep(c(par[10:11], 1, par[12:20]), nrow(X)/12)
+  coef = as.matrix(X) %*% par[1:9]
+  add_term = as.vector(coef * dummies)
+  hat_aq_assets = rep(NA, length(add_term))
+  hat_aq_assets = fill_recursive(add_term = tail(add_term, -1), coefs = par[21])
   hat_aq_assets_quarter = roll_sum(hat_aq_assets, n = 3, by = 3) # рассчет квартальной выручки
   return(list(hat_aq_assets = hat_aq_assets,
               hat_aq_assets_quarter = hat_aq_assets_quarter))
 }
 
-R = R_assets
-length(frcst$hat_aq_assets)
-R_quarter = R_assets_quarter
+
 error_opt_assets = function(par, X, R, R_quarter){
   frcst = make_pred_assets(par, X)
-  pse0(frcst$hat_aq_assets, R$r_real)
-  error = pse_abs(pred = frcst$hat_aq_assets, pred_quarter = frcst$hat_aq_assets_quarter,
-                  real = R$r_real, real_quarter = R_quarter$r_real)
-
+  pse0(frcst$hat_aq_assets[2:60], R$r_real[2:60])
+  error = pse_abs(pred = frcst$hat_aq_assets[2:60], pred_quarter = frcst$hat_aq_assets_quarter[2:20],
+                  real = R$r_real[2:60], real_quarter = R_quarter$r_real[2:20])
+error
   return(error)
 }
-
-
 
 error_opt_assets(par_0, X = X_aq_assets, R = R_assets, R_quarter = R_assets_quarter)
 
@@ -108,25 +116,26 @@ result_sa_aq_assets = GenSA(lower = rep(-0.5, length(par_0)),
                             upper = rep(1.9, length(par_0)),
                             fn = error_opt_assets,
                             X = X_aq_assets, R = R_assets, R_quarter = R_assets_quarter,
-                            control = list(verbose = TRUE, max.time = 300))
+                            control = list(verbose = TRUE, max.time = 60))
 
-# result_stogo_aq_assets = stogo(lower = rep(-0.5, length(par_0)),
-#                            upper = rep(1.9, length(par_0)),
-#                            fn = error_opt_assets,
-#                            x0 = par_0,
-#                            maxeval = 100,
-#                            X = X_aq_assets[1:96, ], R = R_assets, R_quarter = R_assets_quarter)
-# result_stogo_aq_assets
 par_aq_assets = result_sa_aq_assets$par
-export(par_aq_assets, 'par_aq_assets.Rds')
+par_aq_assets = import('par_aq_assets.Rds')
 pred_res_assets = make_pred_assets(par_aq_assets, X_aq_assets)
 
 tsib2plot = mutate(all_vars, model = pred_res_assets$hat_aq_assets)
-autoplot(tsib2plot, vars(aq_assets, model))
 tsib2plot %>% select(model, aq_assets) %>%
   pivot_longer(cols = c("model", "aq_assets")) %>%
   as_tsibble(index=date, key=name) %>%
   autoplot(value)
+
+
+
+
+
+mape(all_vars$aq_assets[2:60], pred_res_assets$hat_aq_assets[2:60])
+
+
+
 
 
 
@@ -137,17 +146,17 @@ cors_obl = cor(all_vars$aq_obl, select(as_tibble(all_vars), -date, -dum01:-dum12
 is_high_obl = (cors_obl > 0.3) %>% as.data.frame
 high_cor_obl = which(unlist(transpose(is_high_obl)))
 names(high_cor_obl)
-
-
+all_vars = create_tibble(all_vars)
 
 X_aq_obl = tibble(const = 1,
-                  em_index = all_vars$em_index,
-                  rate_repo = all_vars$rate_repo,
-                  r_dif_resrves = all_vars$r_dif_reserves,
-                  rate_10tr = all_vars$rate_10tr,
-                  dif_usd_eur_ratio = all_vars$dif_usd_eur_ratio,
-                  diff_r = all_vars$gas_lng_4,
-                  rub_usd = all_vars$rub_usd)
+                     r_cur_account = all_vars$r_cur_account,
+                     rate_repo = all_vars$rate_repo/all_vars$rate_10tr,
+                     rub_usd = all_vars$rub_usd,
+                     cur_purch = all_vars$r_cur_purch,
+                     rub_usd_var = all_vars$vcor*rub_usd/lag(rub_usd, 1),
+                     em_index_ratio = all_vars$em_index_ratio,
+                     dif_usd_eur_ratio = all_vars$dif_usd_eur_ratio,
+                     dum_1114 = all_vars$dum_1114)
 
 ncol(X_aq_obl)
 R_obl = all_vars %>%
@@ -159,12 +168,13 @@ R_obl_quarter = all_vars_quater %>%
   rename('r_real' = 'aq_obl') %>%
   na.omit()
 
-
-par = rep(0.6, 19)
-
+ncol(X)
+par = rep(0.6, 20)
+X = X_aq_obl
+ncol(X_aq_obl)
 make_pred_obl = function(par, X){
-  dummies = rep(c(par[9:10], 1, par[11:19]), nrow(X)/12)
-  coef = as.matrix(X) %*% par[1:8]
+  dummies = rep(c(par[10:11], 1, par[12:20]), nrow(X)/12)
+  coef = as.matrix(X) %*% par[1:9]
   hat_aq_obl = as.vector(coef * dummies)
   #hat_aq_assets = fill_recursive(add_term = add_term, coefs = par[16])
   hat_aq_obl_quarter = roll_sum(hat_aq_obl, n = 3, by = 3) # рассчет квартальной выручки
@@ -172,18 +182,19 @@ make_pred_obl = function(par, X){
               hat_aq_obl_quarter = hat_aq_obl_quarter))
 }
 X = X_aq_obl
-R = R_assets
+R = R_obl
 R_quarter = R_obl_quarter
-as.matrix(X_aq_obl) %*% par[1:8]
+as.matrix(X_aq_obl) %*% par[1:9]
 error_opt_obl = function(par, X, R, R_quarter){
   frcst = make_pred_obl(par, X)
-  pse0(frcst$hat_aq_obl_quarter, R_quarter$r_real)
-  error = pse_abs(pred = frcst$hat_aq_obl, pred_quarter = frcst$hat_aq_obl_quarter,
-                  real = R$r_real, real_quarter = R_quarter$r_real)
-
+  pse0(frcst$hat_aq_obl_quarter[2:32], R_quarter$r_real[2:32])
+  error = pse_abs(pred = frcst$hat_aq_obl[2:96], pred_quarter = frcst$hat_aq_obl_quarter[2:32],
+                  real = R$r_real[2:96], real_quarter = R_quarter$r_real[2:32])
+error
 
   return(error)
 }
+
 
 
 ncol(X_aq_obl)
@@ -199,16 +210,20 @@ result_sa_obl = GenSA(lower = rep(-0.5, length(par_0)),
 
 
 par_aq_obl = result_sa_obl$par
-export(par_aq_obl, 'par_aq_obl.Rds')
+par_aq_obl = import('par_aq_obl.Rds')
 pred_res_obl = make_pred_obl(par_aq_obl, X_aq_obl)
 
 tsib2plot2 = mutate(all_vars, model = pred_res_obl$hat_aq_obl)
 autoplot(tsib2plot2, vars(aq_obl, model))
-tsib2plot %>% select(model, aq_obl) %>%
+tsib2plot2 %>% select(model, aq_obl) %>%
   pivot_longer(cols = c("model", "aq_obl")) %>%
   as_tsibble(index=date, key=name) %>%
   autoplot(value)
 
+all_vars %>% select(rub_usd, ) %>%
+  pivot_longer(cols = c("model", "aq_obl")) %>%
+  as_tsibble(index=date, key=name) %>%
+  autoplot(value)
 
 
 r_bal_fin_hat = pred_res_assets$hat_aq_assets - pred_res_obl$hat_aq_obl

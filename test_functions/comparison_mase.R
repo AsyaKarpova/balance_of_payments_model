@@ -29,5 +29,5 @@ mase_final
 series_models
 
 ets_fcst = data_forecasts %>% as_tibble() %>%select(-.distribution) %>%filter(.model == 'ets')
-mase(tail(data$value, 10), ets_fcst$value)
+mape(tail(data$value, 10), ets_fcst$value)
 help(mase)
