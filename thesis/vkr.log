@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.14159265-2.6-0.99999 (TeX Live 2018/W32TeX) (preloaded format=xelatex 2018.7.2)  3 JUN 2020 10:15
+This is XeTeX, Version 3.14159265-2.6-0.99999 (TeX Live 2018/W32TeX) (preloaded format=xelatex 2018.7.2)  11 JUN 2020 18:06
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -2041,11 +2041,11 @@ Package Fancyhdr Warning: \headheight is too small (10.2pt):
 [37]
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 892.
+(caption)                particular \caption on input line 890.
 See the caption package documentation for explanation.
 
 [38]
-Overfull \hbox (19.26126pt too wide) in paragraph at lines 903--909
+Overfull \hbox (19.26126pt too wide) in paragraph at lines 901--907
 \TU/TimesNewRoman(2)/m/n/14.4 гнозы может быть затруднительно, однако кажется р
 азумным рассмотреть несколь-
  []
@@ -2059,27 +2059,27 @@ Package Fancyhdr Warning: \headheight is too small (10.2pt):
 [39]
 
 Package caption Warning: The option `hypcap=true' will be ignored for this
-(caption)                particular \caption on input line 932.
+(caption)                particular \caption on input line 930.
 See the caption package documentation for explanation.
 
 File: cur_2015.png Graphic file (type bmp)
 <cur_2015.png>
 
-Overfull \hbox (28.45273pt too wide) in paragraph at lines 940--941
+Overfull \hbox (28.45273pt too wide) in paragraph at lines 938--939
  [][] 
  []
 
 File: rub_2015.png Graphic file (type bmp)
 <rub_2015.png>
 
-Overfull \hbox (28.45273pt too wide) in paragraph at lines 946--947
+Overfull \hbox (28.45273pt too wide) in paragraph at lines 944--945
  [][] 
  []
 
 File: fuels_2015.png Graphic file (type bmp)
 <fuels_2015.png>
 
-Overfull \hbox (28.45273pt too wide) in paragraph at lines 952--953
+Overfull \hbox (28.45273pt too wide) in paragraph at lines 950--951
  [][] 
  []
 
@@ -2111,7 +2111,7 @@ Package Fancyhdr Warning: \headheight is too small (10.2pt):
  This may cause the page layout to be inconsistent, however.
 
 [43]
-Overfull \hbox (0.60852pt too wide) in paragraph at lines 962--964
+Overfull \hbox (0.60852pt too wide) in paragraph at lines 960--962
 []\TU/TimesNewRoman(2)/m/n/14.4 В оптимистичном сценарии основные переменные, х
 арактеризующие внеш-
  []
@@ -2130,38 +2130,38 @@ Package Fancyhdr Warning: \headheight is too small (10.2pt):
  This may cause the page layout to be inconsistent, however.
 
 [45]
-Overfull \hbox (14.54694pt too wide) in paragraph at lines 981--981
+Overfull \hbox (14.54694pt too wide) in paragraph at lines 979--979
 []\TU/TimesNewRoman(2)/m/n/14.4 Guillermo A Calvo. «  Balance of payments crise
 s in a cash-in-advance economy».
  []
 
 
-Overfull \hbox (17.0257pt too wide) in paragraph at lines 981--981
+Overfull \hbox (17.0257pt too wide) in paragraph at lines 979--979
 []\TU/TimesNewRoman(2)/m/n/14.4 Caroline Freund. «  Current account adjustment 
 in industrial countries». В: \TU/TimesNewRoman(2)/m/it/14.4 Journal
  []
 
 
-Overfull \hbox (2.20616pt too wide) in paragraph at lines 981--981
+Overfull \hbox (2.20616pt too wide) in paragraph at lines 979--979
 []\TU/TimesNewRoman(2)/m/n/14.4 Paul Krugman. «  A model of balance-of-payments
  crises». В: \TU/TimesNewRoman(2)/m/it/14.4 Journal of money,
  []
 
 
-Overfull \hbox (11.18394pt too wide) in paragraph at lines 981--981
+Overfull \hbox (11.18394pt too wide) in paragraph at lines 979--979
 \TU/TimesNewRoman(2)/m/n/14.4 inflation targeting». В: \TU/TimesNewRoman(2)/m/i
 t/14.4 Journal of International Economics \TU/TimesNewRoman(2)/m/n/14.4 72.1 (2
 007), с. 242—
  []
 
 
-Overfull \hbox (3.52087pt too wide) in paragraph at lines 981--981
+Overfull \hbox (3.52087pt too wide) in paragraph at lines 979--979
 \TU/TimesNewRoman(2)/m/n/14.4 and current account effects of inflation». В: \TU
 /TimesNewRoman(2)/m/it/14.4 Journal of International Economics
  []
 
 
-Overfull \hbox (3.47975pt too wide) in paragraph at lines 981--981
+Overfull \hbox (3.47975pt too wide) in paragraph at lines 979--979
 []\TU/TimesNewRoman(2)/m/n/14.4 Enrique G Mendoza и Martin Uribe. \TU/TimesNewR
 oman(2)/m/it/14.4 The business cycles of balance-of-payment
  []
@@ -2173,27 +2173,27 @@ Package Fancyhdr Warning: \headheight is too small (10.2pt):
  This may cause the page layout to be inconsistent, however.
 
 [46]
-Overfull \hbox (16.53677pt too wide) in paragraph at lines 981--981
+Overfull \hbox (16.53677pt too wide) in paragraph at lines 979--979
 []\TU/TimesNewRoman(2)/m/n/14.4 Maurice Obstfeld. «  Speculative attack and the
  external constraint in a maximizing
  []
 
 
-Overfull \hbox (0.21854pt too wide) in paragraph at lines 981--981
+Overfull \hbox (0.21854pt too wide) in paragraph at lines 979--979
 \TU/TimesNewRoman(2)/m/n/14.4 model of the balance of payments». В: \TU/TimesNe
 wRoman(2)/m/it/14.4 Canadian Journal of Economics \TU/TimesNewRoman(2)/m/n/14.4
  (1986),
  []
 
 
-Overfull \hbox (3.36253pt too wide) in paragraph at lines 981--981
+Overfull \hbox (3.36253pt too wide) in paragraph at lines 979--979
 \TU/TimesNewRoman(2)/m/it/14.4 ректоров по ключевой ставке 24 апреля 2020 года\
 TU/TimesNewRoman(2)/m/n/14.4 . [][]$[][][][][] [] [] [] [][][] [] [][] [] [][][
 ][][][][][][][] []
  []
 
 
-Overfull \hbox (8.75066pt too wide) in paragraph at lines 981--981
+Overfull \hbox (8.75066pt too wide) in paragraph at lines 979--979
 []\TU/TimesNewRoman(2)/m/it/14.4 Сценарные условия прогноза социально-экономиче
 ского развития на 2019–
  []
@@ -2205,11 +2205,11 @@ Package Fancyhdr Warning: \headheight is too small (10.2pt):
  This may cause the page layout to be inconsistent, however.
 
 [47]
-Package atveryend Info: Empty hook `BeforeClearDocument' on input line 982.
-Package atveryend Info: Empty hook `AfterLastShipout' on input line 982.
+Package atveryend Info: Empty hook `BeforeClearDocument' on input line 980.
+Package atveryend Info: Empty hook `AfterLastShipout' on input line 980.
  (./vkr.aux)
-Package atveryend Info: Empty hook `AtVeryEndDocument' on input line 982.
-Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 982.
+Package atveryend Info: Empty hook `AtVeryEndDocument' on input line 980.
+Package atveryend Info: Executing hook `AtEndAfterFileList' on input line 980.
 Package rerunfilecheck Info: File `vkr.out' has not changed.
 (rerunfilecheck)             Checksum: 67C0BC89FA3592171C12862BD20698DD.
 
@@ -2219,12 +2219,12 @@ LaTeX Warning: There were multiply-defined labels.
 Package logreq Info: Writing requests to 'vkr.run.xml'.
 \openout1 = `vkr.run.xml'.
 
-Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 982.
+Package atveryend Info: Empty hook `AtVeryVeryEnd' on input line 980.
  ) 
 Here is how much of TeX's memory you used:
  40963 strings out of 492969
  786006 string characters out of 6137284
- 1289322 words of memory out of 5000000
+ 1288322 words of memory out of 5000000
  44427 multiletter control sequences out of 15000+600000
  540242 words of font info for 83 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191

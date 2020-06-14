@@ -1,26 +1,25 @@
 library(forecast)
 library(rio)
-library(RcppRoll) # for rolling window operations
-library(MLmetrics)
-library(GenSA)
-library(stats)
-library(Metrics)
 library(tidyverse)
 library(tsibble)
-library(rlang)
 library(fable)
 library(lubridate)
 library(xtable)
-library(tikzDevice)
 library(patchwork)
 
 
 data = import('data/data_month1.xlsx') %>%
   mutate(date = yearmonth(date))
-all_vars_quater = import('data/data_quarter_new.xlsx')
-all_vars_quater = mutate_at(all_vars_quater, vars(-date), ~ . / 1000)
-par_model = import('script/gensa_par.Rds')
-par_model2 = import('script/par_model.Rds')
+
+# все колонки разделим на 1000, так они входят в модель
+all_vars_quater = import('data/data_quarter_new.xlsx') %>%
+  mutate_at(vars(-date), ~ . / 1000) %>%
+  mutate(date = yearquarter(ymd(date)))
+
+par_model = import('script/gensa_par.Rds') # параметры GenSa
+par_model2 = import('script/par_model.Rds') # параметры из excel
+
+# подсоединить все функции из скрипта functions.R
 source('script/functions.R')
 
 

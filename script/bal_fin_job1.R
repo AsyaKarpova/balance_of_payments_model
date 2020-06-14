@@ -15,11 +15,9 @@ library(lubridate)
 library(skimr)
 library(dtw)
 
-# all data until the end of 2019
-# montly data on balance of finance start with 2012
+
 all_vars = import('data/data_month1.xlsx') %>%
-  mutate(date = yearmonth(date)) %>% as_tsibble() #select(-c(dum_1114:dum12), -c(n_c:n_y), -c(v_exp_gas:v_prod_op),
-                                            #-r_exp_oil, -r_exp_op, -r_exp_gas, -c(p_exp_gas:p_exp_op))%>%
+  mutate(date = yearmonth(date)) %>% as_tsibble()
 
 
 all_vars = all_vars %>% mutate(em_index_ratio = em_index / lag(em_index, 1))
