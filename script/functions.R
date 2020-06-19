@@ -17,7 +17,7 @@ pse_abs = function(pred, pred_quarter, real, real_quarter){
 }
 
 # function for recursive forecast
-
+# y_t = coefs* y_{t-1} + multiplier * add_term_t
 fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1,
                           multiplier = rep(1, length(add_term))) {
   add_term = unlist(add_term)
@@ -31,6 +31,8 @@ fill_recursive = function(first_values = 0, add_term = rep(0, 10), coefs = 1,
 
   return(vector)
 }
+
+# чтобы не путать ни с каким пакетом, переопределила лаг
 
 lag = dplyr::lag
 

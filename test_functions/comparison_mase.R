@@ -1,8 +1,17 @@
-library(fable)
 library(Metrics)
+library(tsibble)
+library(tidyverse)
+library(fable)
+library(fabletools)
 
+
+# !!!сравниваем значения mape и mase в двух разных пакетах
+
+# искусственные данные
 data = tsibble(date = 1:100, value = rnorm(100), index = date)
-data_train = data %>% filter(date<=90)
+data_train = data %>% filter(date<=90) # 10 наблюдений отправили в тест
+
+# оценим несколько моделей с помощью пакета fable
 models = data_train %>%
   model(
     ets = ETS(value),
@@ -10,24 +19,29 @@ models = data_train %>%
     rw  = RW(value),
     naive = NAIVE(value)
   )
+
+# прогноз на 10 шагов вперед
 data_forecasts = models %>%
   forecast(h = 10)
 
-mape = data_forecasts %>%
-  accuracy(data) %>%
+# считаем метрики по формулам из fable на тесте!!! по всем моделям
+all_metrics = data_forecasts %>%
+  fabletools::accuracy(data) %>% #чтобы не путалась с accuracy из Metrics
   arrange(MAPE)
 
-mape %>% View()
+# дальше вручную пробуем посчитать mase — ответы не сошлись, так что может и неправильно :)
+# считали как отношение mae модели к mae random walk
+mae = all_metrics %>% select(.model, MAE)
+mae_long = mae %>% pivot_longer(cols = MAE)
+mae_rw = mae_long %>%filter(.model == 'rw') %>%
+  rename(value_rw = value)%>% pull(value_rw)
+mase_final = mae %>%
+  mutate(mase = MAE / mae_rw) %>%filter(.model != 'rw')
 
-mase = mape %>% select(.model, MAE)
-mase
-mase_l = mase %>% pivot_longer(cols = MAE)
-mase_rw = mase_l %>%filter(.model == 'rw') %>% rename(value_rw = value)  %>% select(value_rw)
-mase_fable = mase$MAE/mase_rw[[1]]
-mase_final = left_join(mase, mase_rw, by=TRUE) %>% mutate(mase = MAE / value_rw) %>%filter(.model != 'rw')
-mase_final
-series_models
 
-ets_fcst = data_forecasts %>% as_tibble() %>%select(-.distribution) %>%filter(.model == 'ets')
-mape(tail(data$value, 10), ets_fcst$value)
-help(mase)
+# а тут mase пакетом Metrics
+ets_fcst = data_forecasts %>%
+  as_tibble() %>%
+  select(-.distribution) %>%
+  filter(.model == 'ets')
+mase(tail(data$value, 10), ets_fcst$value)

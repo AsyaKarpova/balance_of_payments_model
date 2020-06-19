@@ -1,13 +1,9 @@
-# library(forecast)
 library(rio)
 library(RcppRoll) # for rolling window operations
-library(MLmetrics)
 
 library(GenSA) # GenSA optimizator
 library(nloptr) # stogo optimizator
 
-library(stats)
-library(Metrics)
 library(tidyverse)
 library(tsibble)
 library(fable)
@@ -16,26 +12,28 @@ library(skimr)
 library(dtw)
 
 
-all_vars = import('data/data_month1.xlsx') %>%
-  mutate(date = yearmonth(date)) %>% as_tsibble()
+# месячные данные по финансовому балансу с 2012 года
+raw_month = import('data/data_month1.xlsx') %>%
+  mutate(date = yearmonth(date)) %>% as_tsibble() %>%
+  filter(year(date) > 2011, year(date) < 2020)
 
-
-all_vars = all_vars %>% mutate(em_index_ratio = em_index / lag(em_index, 1))
-all_vars = all_vars %>% filter(year(date) > 2011, year(date) < 2020)
 source('script/functions.R')
-#all_vars = all_vars %>%na.omit()
 
+# функция из скрипта. Создает все те переменные, что использовались в предыдущих уравнениях
+all_vars = create_tibble(raw_month)
+names(all_vars)
 
-all_vars_quater = import('data/data_quarter_new.xlsx')
-all_vars_quater = mutate_at(all_vars_quater, vars(-date), ~ . / 1000)
-
-all_vars_quater = mutate(all_vars_quater, date = yearquarter(date)) %>%
+# делим все  квартальные значения на 1000 для добавления в модель
+all_vars_quater = import('data/data_quarter_new.xlsx') %>%
+  mutate_at(vars(-date), ~ . / 1000) %>%
+  mutate(date = yearquarter(date)) %>%
   as_tsibble() %>% filter(year(date) > 2011)
 
 ## март 2013 - большие значений aq_obl и aq_assets
 
 
-cors = cor(all_vars$aq_assets, select(as_tibble(all_vars), -date, -dum01:-dum12), use = 'complete.obs') %>%
+cors = all_vars$aq_assets %>%
+  cor(select(as_tibble(all_vars), -date, -dum01:-dum12), use = 'complete.obs')# %>%
   as.data.frame(row.names = 'val') %>% abs()
 
 
@@ -49,9 +47,8 @@ names(high_cor_assets)
 is_high_obl = (cors_obl > 0.3) %>% as.data.frame
 high_cor_obl = which(unlist(transpose(is_high_obl)))
 
-all_vars = create_tibble(all_vars)
-all_vars$aq_assets
-all_vars$r_cur_purch
+
+
 X_aq_assets = tibble(const = 1,
                      r_cur_account = all_vars$r_cur_account,
                      rate_repo = all_vars$rate_repo/all_vars$rate_10tr,

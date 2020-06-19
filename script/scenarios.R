@@ -11,7 +11,9 @@ library(rlang)
 library(fable)
 library(lubridate)
 
-
+data = import('data/data_month1.xlsx') %>%
+  mutate(date = yearmonth(date)) %>%
+  filter(year(date)<=2019)
 data_base = import('scenarios/all_vars_2020_base.xlsx') %>%
   mutate(date = yearmonth(date))
 data_best = import('data/all_vars_2020_best.xlsx') %>%
@@ -67,8 +69,6 @@ exog_tsb = long_exog %>% as_tsibble(index = date, key = series)
 endog_tsb = long_endog %>% as_tsibble(index = date, key = series)
 
 
-#long_exog %>% group_by(series) %>% top_n(date, n=1)
-
 # models
 
 series_models = exog_tsb %>%
@@ -122,7 +122,7 @@ all_vars_bad = all_vars_tsb_bad %>% spread(series, value)
 
 #### сценарий!!!!
 #https://cbr.ru/Collection/Collection/File/27833/forecast_200424.pdf
-# BRENT - 27, 35, 45
+
 
 
 #all_vars = all_vars %>% mutate(r_price_cur_purch = ifelse(r_dum_cur_purch == 0, 0, r_price_cur_purch))
