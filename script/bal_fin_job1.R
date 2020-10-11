@@ -10,7 +10,7 @@ library(fable)
 library(lubridate)
 library(skimr)
 library(dtw)
-
+#GITCOMMENT
 
 # месячные данные по финансовому балансу с 2012 года
 raw_month = import('data/data_month1.xlsx') %>%
