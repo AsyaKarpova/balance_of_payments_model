@@ -1,39 +1,25 @@
-library(forecast)
-library(rio)
+library(forecast)#
+library(rio)#
 library(RcppRoll) # for rolling window operations
 library(MLmetrics)
 library(GenSA)
 library(stats)
 library(Metrics)
-library(tidyverse)
-library(tsibble)
-library(fable)
+library(tidyverse)#
+library(tsibble)#
+library(fable)#
 library(lubridate)
 
 
 prices = import('data/data_month1.xlsx') %>%
   mutate(date = yearmonth(date)) %>%
   filter(year(date)<=2019)
+
 prices_quater = import('data/data_quarter_new.xlsx')
 prices_quater = mutate_at(prices_quater, vars(-date), ~ . / 1000) %>%
-  mutate(date = yearquarter(date))%>% filter(year(date)<=2019)
+  mutate(date = yearquarter(date)) %>% filter(year(date)<=2019)
 par_model = import('script/gensa_par.Rds')
 source('script/functions.R')
-
-par_oil = import('par_oil_2019.Rds')
-par_gas = import('par_gas_2019.Rds')
-par_op = import('par_op_2019.Rds')
-par_othg = import('par_othg_2019.Rds')
-par_imp = import('par_imp_2019.Rds')
-par_exp_serv = import('par_exp_serv_2019.Rds')
-par_bal_wage = import('par_bal_wage_2019.Rds')
-par_rent_sinc = import('par_rent_sinc.Rds')
-par_inv = import('par_inv_2019.Rds')
-par_errors = import('par_errors_2019.Rds')
-par_difr_res = import('par_dif_res_2019.Rds')
-par_cur_purch = import('par_cur_purch_2019.Rds')
-par_rub_usd = import('par_rub_usd_2019.Rds')
-
 
 # gas, op, oil monthly data until 2013Q12 (end_2013 obs.)
 # #export, import, n_' until 2018Q12 (end_2018 obs.)
@@ -74,7 +60,7 @@ result_sa = GenSA(lower = rep(-1, 18),
 
 par_oil = result_sa$par
 
-#export(par_oil, 'par_oil_2019.Rds')
+par_oil = import('par_2019/par_oil_2019.Rds')
 
 pred_oil = make_pred_oil(par_oil, X_oil, R_oil)
 r_hat_oil = pred_oil$r_hat_oil

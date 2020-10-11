@@ -218,9 +218,9 @@ cur_acc = autoplot(ts.union(real_data = window(ts(all_vars_base$r_cur_account, s
                   good = window(ts(predictions_2020_best$r_hat_cur_acc, start = c(2006, 1), freq = 12),start = c(2015, 1))), size=0.8) + ylab('млрд.долл.') + xlab('') + ggtitle('Счет текущих операций')
 
 library(patchwork)
-cur_acc/cp
+cur_acc-cp
 
-ru/cp
+ru/cp|cur_acc
 ro/rgб
 # rub_usd
 
